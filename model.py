@@ -30,16 +30,12 @@ class ChatModel():
         self.local = local
         self.api_key = os.getenv("API_KEY")
 
-        if local:
-            self.model = AutoModelForCausalLM.from_pretrained(
-                model_name,
-                torch_dtype="auto",
-                device_map="auto"
-            )
+        if local == True:
+            self.model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype="auto", device_map="auto")
             self.tokenizer = AutoTokenizer.from_pretrained(model_name)
 
-    @retry(wait=wait_random_exponential(min=1, max=60),
-       stop=stop_after_attempt(6))
+
+    @retry(wait=wait_random_exponential(min=1, max=60),stop=stop_after_attempt(6))
     def generate_remote(self, messages: List[Dict]) -> Union[List[str], str]:
 
         headers = {
@@ -76,45 +72,34 @@ class ChatModel():
             choice["message"]["content"]
             for choice in response["choices"]
         ]
+
+
     def generate_local(self, messages: List[Dict]) -> Union[List[str], str]:
         text = self.tokenizer.apply_chat_template(
             messages,
             tokenize=False,
             add_generation_prompt=True
         )
-
-        model_inputs = self.tokenizer(
-            [text],
-            return_tensors="pt"
-        ).to(self.model.device)
+        model_inputs = self.tokenizer([text], return_tensors="pt").to(self.model.device)
 
         generated_ids = self.model.generate(
             **model_inputs,
             max_new_tokens=512,
-            temperature=self.temperature,
-            do_sample=True
+            temperature = self.temperature,
+            do_sample = True
         )
-
         generated_ids = [
-            output_ids[len(input_ids):]
-            for input_ids, output_ids in zip(
-                model_inputs.input_ids,
-                generated_ids
-            )
+            output_ids[len(input_ids):] for input_ids, output_ids in zip(model_inputs.input_ids, generated_ids)
         ]
-
-        response = self.tokenizer.batch_decode(
-            generated_ids,
-            skip_special_tokens=True
-        )[0]
-
+        response = self.tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
         return response
 
+
     def generate(self, messages: List[Dict]) -> Union[List[str], str]:
-        if self.local:
+        if self.local == True:
             return self.generate_local(messages)
         else:
-            return self.generate_remote(messages)
+            return self.generate_remote(messages) 
 
 
 if __name__ == "__main__":

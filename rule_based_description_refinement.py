@@ -5,20 +5,20 @@ from model import ChatModel
 from utils import parse_code_block, extract_module_header, run_design
 
 description_refinement_rules = """
-As a hardware design expert working with PyRTL (a Python-based HDL), you will be given a hardware module description. Your task is to clarify ambiguities or contradictions in the user-provided description, specifically addressing the following aspects:
-1. Clarify overall circuit functionality if ambiguous.
-2. Ensure all inputs and outputs are clearly described with bitwidth.
-3. Explicitly specify which signals are sequential (require Register) and which are combinational.
-4. If initialization behavior is required, specify that all Registers must use reset_value=0.
+As a natural language understanding expert, you will be given a PyRTL Module Description. 
+Your task is to clarify ambiguities or contradictions in the user-provided description, specifically addressing the following aspects:
 
-Present the final optimized module description enclosed within:
+1. Check for unclear or contradictory functionality in the overall module description.
+   If issues exist, clarify the module's overall function. Remind the user to provide additional information when necessary.
+2. Examine whether input/output signals are clearly described. 
+   If unclear, infer and supplement their basic functionality along with relevant input/output examples.
+3. Verify if initialization information is missing. 
+   If missing, you should add information about all register-type variables (pyrtl.Register) that must be explicitly initialized to 0.
 
-[refined description begin]:
-...
-[end]
-
-The final output must be a natural language design description (not code).
+Note present the final optimized module description enclosed within [refined descritption begin]: [end].
+Note the final output must be a natural language design description (not code).
 """
+
 
 programming_rules_suffix = """
 Here are the PyRTL design rules you must follow:
@@ -57,19 +57,17 @@ def rule_based_description_refinement(llm: ChatModel, description: str, task_pro
     module_header = extract_module_header(description)
 
     system_prompt = f"""
-As a PyRTL (Python Hardware Description Language) programming expert, you need to complete PyRTL code based on user's prompt.
+    As a PyRTL programming expert, you need to complete PyRTL code based on user's prompt.
+    {task_prompt}
 
-{task_prompt}
-
-When writing PyRTL designs, you need to adhere to the following rules:
-{programming_rules_suffix}
-"""
+    When writing PyRTL designs, you need to adhere to the following rules:
+    {programming_rules_suffix}
+    """
 
     user_prompt = f"""
-{refined_description}
-
-{module_header}
-"""
+    {refined_description}
+    {module_header}
+    """
 
     messages = [
         {"role": "system", "content": system_prompt},
@@ -77,31 +75,25 @@ When writing PyRTL designs, you need to adhere to the following rules:
     ]
 
     response = llm.generate(messages)
-
     module_block = parse_code_block(response, "python")
+
     design = module_header + module_block
 
     return design, refined_description
 
 
 if __name__ == "__main__":
-    llm = ChatModel(
-        model_name="Qwen/Qwen2.5-Coder-32B-Instruct",
-        temperature=0.1,
-        local=False
-    )
+    llm = ChatModel(model_name="Qwen/Qwen2.5-Coder-32B-Instruct", temperature=0.1, local=False)
 
     task_prompt = """
-You only complete chats with syntax correct PyRTL code. The top-level function must be named TopModule. Do not include extra explanations. Only output Python code.
-"""
+    You only complete chats with syntax correct PyRTL code. 
+    The top-level function must be named TopModule. 
+    Do not include input and output definitions.
+    """
 
     input_path = "./input"
 
-    llm = ChatModel(
-        model_name="Qwen/Qwen2.5-Coder-32B-Instruct",
-        temperature=0.1,
-        local=False
-    )
+    llm = ChatModel(model_name="Qwen/Qwen2.5-Coder-32B-Instruct", temperature=0.1, local=False)
 
     with open(f"{input_path}/description.txt", "r", encoding='utf-8', errors='ignore') as file:
         description = file.read()
