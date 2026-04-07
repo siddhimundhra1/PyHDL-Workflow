@@ -1,0 +1,94 @@
+# [Keyword]: One Bit Full Adder Example
+
+# [Design Category]: Combinational Logic
+
+# [Design Function Description]:
+# This circuit implements a 1-bit full adder. It takes three 1-bit inputs
+# (a, b, c) and computes their sum and carry-out. The sum is computed using
+# XOR operations, while the carry-out is computed using AND/OR logic.
+
+# [Input Signal Description]:
+# a: 1-bit input
+# b: 1-bit input
+# c: 1-bit input (carry-in)
+
+# [Output Signal Description]:
+# sum: 1-bit output representing the least significant bit of a + b + c
+# carry_out: 1-bit output representing the carry-out of the addition
+
+# [Design Detail]:
+# sum = a ^ b ^ c
+# carry_out = (a & b) | (a & c) | (b & c)
+
+import random
+import pyrtl
+
+# ----------------------------
+# Step 1: Define Logic
+# ----------------------------
+
+# Intermediate wires
+temp1 = pyrtl.WireVector(bitwidth=1, name="temp1")
+temp2 = pyrtl.WireVector()
+
+# Inputs
+a = pyrtl.Input(1, "a")
+b = pyrtl.Input(1, "b")
+c = pyrtl.Input(1, "c")
+
+# Outputs
+sum = pyrtl.Output(1, "sum")
+carry_out = pyrtl.Output(1, "carry_out")
+
+# Logic definition
+sum <<= a ^ b ^ c
+
+temp1 <<= a & b
+temp2 <<= a & c
+temp3 = b & c
+
+carry_out <<= temp1 | temp2 | temp3
+
+# Print hardware block
+print("--- One Bit Adder Implementation ---")
+print(pyrtl.working_block())
+
+# ----------------------------
+# Step 2: Simulate Design
+# ----------------------------
+
+sim = pyrtl.Simulation()
+
+for _cycle in range(15):
+    sim.step({
+        "a": random.randrange(2),
+        "b": random.randrange(2),
+        "c": random.randrange(2)
+    })
+
+print("\n--- One Bit Adder Simulation ---")
+sim.tracer.render_trace(symbol_len=2)
+
+# Inspect example value
+a_value = sim.inspect(a)
+print("The latest value of 'a' was:", a_value)
+
+# ----------------------------
+# Step 3: Verification
+# ----------------------------
+
+for cycle in range(15):
+    add_result = (
+        sim.tracer.trace["a"][cycle]
+        + sim.tracer.trace["b"][cycle]
+        + sim.tracer.trace["c"][cycle]
+    )
+
+    python_sum = add_result & 0x1
+    python_cout = (add_result >> 1) & 0x1
+
+    if (
+        python_sum != sim.tracer.trace["sum"][cycle]
+        or python_cout != sim.tracer.trace["carry_out"][cycle]
+    ):
+        raise Exception("This Example is Broken!!!")

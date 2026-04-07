@@ -1,0 +1,98 @@
+# [Keyword]: Signed Integer Arithmetic Example
+
+# [Design Category]: Combinational Logic
+
+# [Design Function Description]:
+# This example demonstrates the difference between unsigned and signed integer
+# addition in hardware. It highlights how incorrect results occur when signed
+# values are treated as unsigned, and shows correct implementations using
+# `signed_add()` and manual sign extension.
+
+# [Input Signal Description]:
+# a: 2-bit input representing an integer (interpreted as unsigned or signed)
+# b: 2-bit input representing an integer (interpreted as unsigned or signed)
+
+# [Output Signal Description]:
+# unsigned_sum: 3-bit output representing a + b using unsigned addition
+# signed_sum: 3-bit output representing a + b using signed addition
+# sign_extended_sum: 3-bit output using manual sign extension for signed addition
+
+# [Design Detail]:
+# unsigned_sum = a + b
+# signed_sum = signed_add(a, b)
+# sign_extended_sum = (a.sign_extended(3) + b.sign_extended(3)).truncate(3)
+
+import pyrtl
+
+# ----------------------------
+# Part 1: Unsigned Addition
+# ----------------------------
+
+a = pyrtl.Input(bitwidth=2, name="a")
+b = pyrtl.Input(bitwidth=2, name="b")
+
+unsigned_sum = pyrtl.Output(bitwidth=3, name="unsigned_sum")
+unsigned_sum <<= a + b
+
+unsigned_inputs = {
+    "a": [0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3],
+    "b": [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3],
+}
+
+sim = pyrtl.Simulation()
+sim.step_multiple(provided_inputs=unsigned_inputs)
+
+print("Unsigned addition: unsigned_sum == a + b")
+sim.tracer.render_trace(repr_func=int)
+
+# ----------------------------
+# Part 2: Incorrect Signed Interpretation
+# ----------------------------
+
+print("\nReinterpreting unsigned results as signed (INCORRECT):")
+sim.tracer.render_trace(repr_func=pyrtl.val_to_signed_integer)
+
+# ----------------------------
+# Part 3: Correct Signed Addition
+# ----------------------------
+
+pyrtl.reset_working_block()
+
+a = pyrtl.Input(bitwidth=2, name="a")
+b = pyrtl.Input(bitwidth=2, name="b")
+
+signed_sum = pyrtl.Output(bitwidth=3, name="signed_sum")
+signed_sum <<= pyrtl.signed_add(a, b)
+
+signed_inputs = {
+    "a": [-2, -2, -2, -2, -1, -1, -1, -1, 0, 0, 0, 0, 1, 1, 1, 1],
+    "b": [-2, -1, 0, 1, -2, -1, 0, 1, -2, -1, 0, 1, -2, -1, 0, 1],
+}
+
+sim = pyrtl.Simulation()
+sim.step_multiple(provided_inputs=signed_inputs)
+
+print("\nCorrect signed addition using signed_add():")
+sim.tracer.render_trace(repr_func=pyrtl.val_to_signed_integer)
+
+# ----------------------------
+# Part 4: Manual Sign Extension
+# ----------------------------
+
+pyrtl.reset_working_block()
+
+a = pyrtl.Input(bitwidth=2, name="a")
+b = pyrtl.Input(bitwidth=2, name="b")
+
+sign_extended_sum = pyrtl.Output(bitwidth=3, name="sign_extended_sum")
+
+extended_a = a.sign_extended(bitwidth=3)
+extended_b = b.sign_extended(bitwidth=3)
+
+sign_extended_sum <<= (extended_a + extended_b).truncate(bitwidth=3)
+
+sim = pyrtl.Simulation()
+sim.step_multiple(provided_inputs=signed_inputs)
+
+print("\nCorrect signed addition using manual sign extension:")
+sim.tracer.render_trace(repr_func=pyrtl.val_to_signed_integer)

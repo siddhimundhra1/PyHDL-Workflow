@@ -1,0 +1,150 @@
+# [Keyword]: PyRTL Debugging Techniques Example
+
+# [Design Category]: Debugging / Verification
+
+# [Design Function Description]:
+# This example demonstrates multiple debugging strategies in PyRTL, including:
+# tracing intermediate signals, using `probe()`, enabling debug mode, inspecting
+# WireVector stack traces, and visualizing hardware graphs. It highlights how
+# to debug hardware descriptions where definition and execution occur separately.
+
+# [Input Signal Description]:
+# in1: 8-bit input
+# in2: 8-bit input
+# in3: 8-bit input (used in addition example)
+
+# [Output Signal Description]:
+# out: 10-bit output (result of chained additions)
+# debug_out: 9-bit output for intermediate debugging
+# out1, out2: outputs used in multiplier debugging
+#
+# [Design Detail]:
+# out = kogge_stone(kogge_stone(in1, in2), in2)
+# debug_out = kogge_stone(in1, in2)
+# multout = tree_multiplier(in1, in2)
+# probe() used to inspect intermediate wires
+
+import io
+import random
+import pyrtl
+from pyrtl.rtllib.adders import kogge_stone
+from pyrtl.rtllib.multipliers import tree_multiplier
+
+# ----------------------------
+# Part 1: Debugging via Outputs
+# ----------------------------
+
+in1 = pyrtl.Input(8, "in1")
+in2 = pyrtl.Input(8, "in2")
+in3 = pyrtl.Input(8, "in3")
+
+out = pyrtl.Output(10, "out")
+
+add1_out = kogge_stone(in1, in2)
+add2_out = kogge_stone(add1_out, in2)  # (intentional design choice)
+out <<= add2_out
+
+# Debug intermediate signal
+debug_out = pyrtl.Output(9, "debug_out")
+debug_out <<= add1_out
+
+# Simulate
+random.seed(93729473)
+vals1 = [random.randrange(256) for _ in range(20)]
+vals2 = [random.randrange(256) for _ in range(20)]
+vals3 = [random.randrange(256) for _ in range(20)]
+
+sim = pyrtl.Simulation()
+sim.step_multiple({"in1": vals1, "in2": vals2, "in3": vals3})
+
+print("---- Inputs and debug_out ----")
+print("in1:       ", sim.tracer.trace["in1"])
+print("in2:       ", sim.tracer.trace["in2"])
+print("debug_out: ", sim.tracer.trace["debug_out"])
+
+# Verify correctness of first adder
+for cycle in range(len(vals1)):
+    actual = sim.tracer.trace["debug_out"][cycle]
+    expected = sim.tracer.trace["in1"][cycle] + sim.tracer.trace["in2"][cycle]
+    assert actual == expected
+
+# ----------------------------
+# Part 2: Using probe()
+# ----------------------------
+
+pyrtl.reset_working_block()
+
+in1 = pyrtl.Input(8, "in1")
+in2 = pyrtl.Input(8, "in2")
+
+out1 = pyrtl.Output(8, "out1")
+out2 = pyrtl.Output(8, "out2")
+
+multout = tree_multiplier(in1, in2)
+
+# Probing signals
+pyrtl.probe(multout, "std_probe")
+out1 <<= pyrtl.probe(multout, "stdout_probe") * 2
+pyrtl.probe(multout + 32, "adder_probe")
+pyrtl.probe(multout[2:7], "select_probe")
+out2 <<= pyrtl.probe(multout)[2:16]
+
+# Simulate
+vals1 = [random.randrange(10) for _ in range(10)]
+vals2 = [random.randrange(10) for _ in range(10)]
+
+sim = pyrtl.Simulation()
+sim.step_multiple({"in1": vals1, "in2": vals2})
+
+print("\n---- Using Probes ----")
+sim.tracer.render_trace(repr_func=str)
+sim.tracer.print_trace()
+
+# ----------------------------
+# Part 3: Debug Mode & Stack Traces
+# ----------------------------
+
+print("\n--- Probe with Debug Mode ---")
+pyrtl.set_debug_mode()
+pyrtl.probe(multout - 16, "debugsubtr_probe")
+pyrtl.set_debug_mode(debug=False)
+
+# Enable stack tracing
+pyrtl.set_debug_mode()
+
+test_out = pyrtl.Output(9, "test_out")
+test_out <<= kogge_stone(in1, in2)
+
+wire_trace = test_out.init_call_stack
+
+print("---- Stack Trace ----")
+for frame in wire_trace:
+    print(frame)
+
+# ----------------------------
+# Part 4: Custom Metadata
+# ----------------------------
+
+dummy_wv = pyrtl.WireVector(1, name="blah")
+dummy_wv.name = "argh"
+
+dummy_wv.my_custom_property_name = "example metadata"
+dummy_wv.custom_value = 13
+
+pyrtl.working_block().remove_wirevector(dummy_wv)
+
+# ----------------------------
+# Part 5: Graph Visualization
+# ----------------------------
+
+pyrtl.working_block().sanity_check()
+pyrtl.passes._remove_unused_wires(pyrtl.working_block())
+
+print("\n--- Trivial Graph Format (first 10 lines) ---")
+with io.StringIO() as tgf:
+    pyrtl.output_to_trivialgraph(tgf)
+    for i, line in enumerate(tgf.getvalue().split("\n")):
+        if i == 10:
+            break
+        print(line)
+    print("...")

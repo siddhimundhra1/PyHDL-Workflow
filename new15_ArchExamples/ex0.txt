@@ -1,0 +1,59 @@
+# [Keyword]: 2012 q1g
+
+# [Design Category]: Combinational Logic
+
+# [Design Function Description]:
+# This circuit implements a Boolean function using AND, OR, and NOT gates.
+# It evaluates a 4-bit input vector and produces a single-bit output based
+# on a sum-of-products logical expression.
+
+# [Input Signal Description]:
+# x[4:1]: A 4-bit input vector. Each bit contributes to the logical conditions:
+#   x[1] → least significant bit
+#   x[4] → most significant bit
+
+# [Output Signal Description]:
+# f: A single-bit output representing the result of the Boolean expression.
+
+# [Design Detail]:
+# f = (~x[1] & x[3]) 
+#   | (~x[2] & ~x[3] & ~x[4]) 
+#   | (x[1] & ~x[2] & x[3] & ~x[4]) 
+#   | (x[2] & x[3] & x[4])
+
+import pyrtl
+
+# Define `Inputs` and `Outputs`.
+x = pyrtl.Input(bitwidth=4, name="x")
+f = pyrtl.Output(bitwidth=1, name="f")
+
+# Map PyRTL indexing to match Verilog x[4:1]
+x1 = x[0]
+x2 = x[1]
+x3 = x[2]
+x4 = x[3]
+
+# Define the logic.
+term1 = (~x1) & x3
+term2 = (~x2) & (~x3) & (~x4)
+term3 = x1 & (~x2) & x3 & (~x4)
+term4 = x2 & x3 & x4
+
+f <<= term1 | term2 | term3 | term4
+
+# Simulate various values for `x`.
+sim = pyrtl.Simulation()
+
+sim.step_multiple({
+    "x": [
+        0b0000,
+        0b0001,
+        0b0010,
+        0b0100,
+        0b0111,
+        0b1111
+    ]
+})
+
+# Display simulation traces.
+sim.tracer.render_trace()

@@ -1,0 +1,132 @@
+# [Keyword]: PyRTL Verilog Interfacing Example
+
+# [Design Category]: Verilog Import / Export / Testbench Generation
+
+# [Design Function Description]:
+# This example demonstrates importing from Verilog (BLIF), exporting PyRTL circuits
+# to Verilog, generating Verilog testbenches, and simulating traces.
+
+# [Input Signal Description]:
+# - x, y, cin : 1-bit inputs for the full adder
+# - zero      : 1-bit input to reset the counter
+
+# [Output Signal Description]:
+# - sum, cout : 1-bit outputs from the full adder
+# - counter_output : 3-bit counter output
+
+# [Design Detail]:
+# - Import a 1-bit full adder from BLIF
+# - Simulate the adder for 15 cycles with random inputs
+# - Build a 3-bit resettable counter
+# - Export counter design and testbench to Verilog
+# - Lower the counter to single-bit Verilog and optimize
+
+import io
+import random
+import pyrtl
+
+# ----------------------------
+# Part 1: Importing From Verilog (BLIF)
+# ----------------------------
+full_adder_blif = """
+.model full_adder
+.inputs x y cin
+.outputs sum cout
+.names $false
+.names $true
+1
+.names y $not$FA.v:12$3_Y
+0 1
+.names x $not$FA.v:11$1_Y
+0 1
+.names cin $not$FA.v:15$6_Y
+0 1
+.names ind3 ind4 sum
+1- 1
+-1 1
+.names $not$FA.v:15$6_Y ind2 ind3
+11 1
+.names x $not$FA.v:12$3_Y ind1
+11 1
+.names ind2 $not$FA.v:16$8_Y
+0 1
+.names cin $not$FA.v:16$8_Y ind4
+11 1
+.names x y $and$FA.v:19$11_Y
+11 1
+.names ind0 ind1 ind2
+1- 1
+-1 1
+.names cin ind2 $and$FA.v:19$12_Y
+11 1
+.names $and$FA.v:19$11_Y $and$FA.v:19$12_Y cout
+1- 1
+-1 1
+.names $not$FA.v:11$1_Y y ind0
+11 1
+.end
+"""
+
+pyrtl.input_from_blif(full_adder_blif)
+
+# Retrieve inputs
+x, y, cin = [pyrtl.working_block().get_wirevector_by_name(n) for n in ["x", "y", "cin"]]
+
+# Simulate full adder
+sim = pyrtl.Simulation()
+for _ in range(15):
+    sim.step({"x": random.randrange(2), "y": random.randrange(2), "cin": random.randrange(2)})
+
+# Display inputs and outputs
+input_vectors = pyrtl.working_block().wirevector_subset(pyrtl.Input)
+output_vectors = pyrtl.working_block().wirevector_subset(pyrtl.Output)
+sim.tracer.render_trace(trace_list=[*input_vectors, *output_vectors], symbol_len=2)
+
+# ----------------------------
+# Part 2: Exporting to Verilog (Resettable Counter)
+# ----------------------------
+pyrtl.reset_working_block()
+
+zero = pyrtl.Input(1, "zero")
+counter_output = pyrtl.Output(3, "counter_output")
+counter = pyrtl.Register(3, "counter")
+counter.next <<= pyrtl.select(zero, 0, counter + 1)
+counter_output <<= counter
+
+print("\n--- PyRTL Representation ---")
+print(pyrtl.working_block())
+
+# Export Verilog
+print("\n--- Verilog for the Counter ---")
+with io.StringIO() as verilog_file:
+    pyrtl.output_to_verilog(verilog_file)
+    print(verilog_file.getvalue())
+
+# Simulate counter
+print("\n--- Simulation Results ---")
+sim = pyrtl.Simulation(tracer=pyrtl.SimulationTrace([counter_output, zero]))
+for _ in range(15):
+    sim.step({"zero": random.choice([0, 0, 0, 1])})
+sim.tracer.render_trace()
+
+# Export testbench
+print("\n--- Verilog Testbench (first 10 lines) ---")
+with io.StringIO() as tb_file:
+    pyrtl.output_verilog_testbench(dest_file=tb_file, simulation_trace=sim.tracer)
+    for i, line in enumerate(tb_file.getvalue().split("\n")):
+        if i == 10:
+            break
+        print(line)
+    print("...")
+
+# ----------------------------
+# Part 3: Transformations and Optimization
+# ----------------------------
+# Lower the counter to single-bit operations, then optimize
+print("\n--- Optimized Single-bit Verilog for the Counter ---")
+pyrtl.synthesize()
+pyrtl.optimize()
+
+with io.StringIO() as verilog_file:
+    pyrtl.output_to_verilog(verilog_file)
+    print(verilog_file.getvalue())

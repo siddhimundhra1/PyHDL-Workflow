@@ -1,0 +1,97 @@
+# [Keyword]: Hardware Fibonacci Example
+
+# [Design Category]: Sequential Logic / State Machine / Registers
+
+# [Design Function Description]:
+# This example demonstrates designing a hardware Fibonacci calculator using PyRTL.
+# Iterative Fibonacci computation is translated into registers, adders, and control
+# logic to produce the `n`th Fibonacci number over multiple clock cycles.
+
+# [Input Signal Description]:
+# - n     : 8-bit input specifying which Fibonacci number to compute
+# - start : 1-bit input indicating the start of a new computation
+
+# [Output Signal Description]:
+# - fib   : 8-bit output holding the current Fibonacci number
+# - done  : 1-bit output indicating completion of computation
+
+import pyrtl
+
+# ----------------------------
+# Software Fibonacci for reference
+# ----------------------------
+def software_fibonacci(n: int):
+    """Return the nth Fibonacci number using an iterative Python implementation."""
+    a, b = 0, 1
+    for _ in range(n):
+        a, b = b, a + b
+    return a
+
+print("n   software_fibonacci(n)")
+print("─────────────────────────")
+for n_val in range(10):
+    print(n_val, " ", software_fibonacci(n_val))
+
+# ----------------------------
+# Attempt 4: Full Hardware Fibonacci
+# ----------------------------
+def hardware_fibonacci(n: pyrtl.WireVector, start: pyrtl.WireVector) -> tuple[pyrtl.WireVector, pyrtl.WireVector]:
+    """Hardware Fibonacci implementation using registers, counter, and start signal."""
+    # Registers to hold the Fibonacci state
+    a = pyrtl.Register(bitwidth=n.bitwidth, name="a")
+    b = pyrtl.Register(bitwidth=n.bitwidth, name="b")
+    counter = pyrtl.Register(bitwidth=n.bitwidth, name="counter")
+    local_n = pyrtl.Register(bitwidth=n.bitwidth, name="local_n")
+    
+    # Wire indicating completion
+    local_done = pyrtl.WireVector(bitwidth=1, name="local_done")
+    
+    # Conditional logic for start/reset vs iterative update
+    with pyrtl.conditional_assignment:
+        with start:
+            local_n.next |= n       # Store target n for current calculation
+            counter.next |= 0       # Reset counter
+            a.next |= 0             # Reset Fibonacci state
+            b.next |= 1
+        with pyrtl.otherwise:
+            counter.next |= counter + 1
+            a.next |= b
+            b.next |= a + b
+    
+    local_done <<= counter == local_n
+    return a, local_done
+
+# ----------------------------
+# Inputs / Outputs
+# ----------------------------
+n = pyrtl.Input(bitwidth=8, name="n")
+start = pyrtl.Input(bitwidth=1, name="start")
+fib_out = pyrtl.Output(bitwidth=8, name="fib")
+done_out = pyrtl.Output(bitwidth=1, name="done")
+
+fib, done = hardware_fibonacci(n, start)
+fib_out <<= fib
+done_out <<= done
+
+# ----------------------------
+# Simulation
+# ----------------------------
+print("\nHardware Fibonacci Simulation:")
+sim = pyrtl.Simulation()
+
+# Start computation for n = 7
+sim.step({"n": 7, "start": 1})
+
+# Clear start and continue stepping until done
+sim.step({"n": 0, "start": 0})
+while not sim.inspect("done"):
+    sim.step({"n": 0, "start": 0})
+
+# Render the simulation trace
+sim.tracer.render_trace(
+    trace_list=["n", "start", "counter", "fib", "done"], repr_func=int
+)
+
+# Verify result against software reference
+assert sim.inspect("fib") == software_fibonacci(7)
+print("Hardware Fibonacci result matches software reference:", sim.inspect("fib"))
