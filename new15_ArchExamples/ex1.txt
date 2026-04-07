@@ -1,24 +1,5 @@
-# [Keyword]: One Bit Full Adder Example
 
-# [Design Category]: Combinational Logic
 
-# [Design Function Description]:
-# This circuit implements a 1-bit full adder. It takes three 1-bit inputs
-# (a, b, c) and computes their sum and carry-out. The sum is computed using
-# XOR operations, while the carry-out is computed using AND/OR logic.
-
-# [Input Signal Description]:
-# a: 1-bit input
-# b: 1-bit input
-# c: 1-bit input (carry-in)
-
-# [Output Signal Description]:
-# sum: 1-bit output representing the least significant bit of a + b + c
-# carry_out: 1-bit output representing the carry-out of the addition
-
-# [Design Detail]:
-# sum = a ^ b ^ c
-# carry_out = (a & b) | (a & c) | (b & c)
 
 import random
 import pyrtl

@@ -1,26 +1,5 @@
-# [Keyword]: Signed Integer Arithmetic Example
 
-# [Design Category]: Combinational Logic
 
-# [Design Function Description]:
-# This example demonstrates the difference between unsigned and signed integer
-# addition in hardware. It highlights how incorrect results occur when signed
-# values are treated as unsigned, and shows correct implementations using
-# `signed_add()` and manual sign extension.
-
-# [Input Signal Description]:
-# a: 2-bit input representing an integer (interpreted as unsigned or signed)
-# b: 2-bit input representing an integer (interpreted as unsigned or signed)
-
-# [Output Signal Description]:
-# unsigned_sum: 3-bit output representing a + b using unsigned addition
-# signed_sum: 3-bit output representing a + b using signed addition
-# sign_extended_sum: 3-bit output using manual sign extension for signed addition
-
-# [Design Detail]:
-# unsigned_sum = a + b
-# signed_sum = signed_add(a, b)
-# sign_extended_sum = (a.sign_extended(3) + b.sign_extended(3)).truncate(3)
 
 import pyrtl
 

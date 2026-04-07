@@ -1,28 +1,5 @@
-# [Keyword]: PyRTL Introspection Pipeline Example
 
-# [Design Category]: Sequential Logic / Advanced Abstraction
 
-# [Design Function Description]:
-# This example demonstrates how Python introspection can be used to automatically
-# construct a multi-stage hardware pipeline. The design dynamically identifies
-# pipeline stages and inserts registers between them, enabling concise and scalable
-# pipeline definitions.
-
-# [Input Signal Description]:
-# None (self-contained pipeline with internal feedback loop)
-
-# [Output Signal Description]:
-# loopback: 1-bit internal wire used to create feedback across pipeline stages
-
-# [Design Detail]:
-# Pipeline stages are defined as methods:
-#   stage0 → stage1 → stage2 → stage3 → stage4
-
-# Each assignment to a non-private attribute automatically creates a register:
-#   stage i output → register → stage i+1 input
-
-# Feedback:
-#   loopback = final stage output
 
 import pyrtl
 

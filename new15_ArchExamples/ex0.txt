@@ -1,25 +1,25 @@
-# [Keyword]: 2012 q1g
+[Keyword]: 2012 q1g
 
-# [Design Category]: Combinational Logic
+[Design Category]: Combinational Logic
 
-# [Design Function Description]:
-# This circuit implements a Boolean function using AND, OR, and NOT gates.
-# It evaluates a 4-bit input vector and produces a single-bit output based
-# on a sum-of-products logical expression.
+[Design Function Description]:
+This circuit implements a Boolean function using AND, OR, and NOT gates.
+It evaluates a 4-bit input vector and produces a single-bit output based
+on a sum-of-products logical expression.
 
-# [Input Signal Description]:
-# x[4:1]: A 4-bit input vector. Each bit contributes to the logical conditions:
-#   x[1] → least significant bit
-#   x[4] → most significant bit
+[Input Signal Description]:
+x[4:1]: A 4-bit input vector. Each bit contributes to the logical conditions:
+    x[1] → least significant bit
+    x[4] → most significant bit
 
-# [Output Signal Description]:
-# f: A single-bit output representing the result of the Boolean expression.
+[Output Signal Description]:
+f: A single-bit output representing the result of the Boolean expression.
 
-# [Design Detail]:
-# f = (~x[1] & x[3]) 
-#   | (~x[2] & ~x[3] & ~x[4]) 
-#   | (x[1] & ~x[2] & x[3] & ~x[4]) 
-#   | (x[2] & x[3] & x[4])
+[Design Detail]:
+f = (~x[1] & x[3]) 
+    | (~x[2] & ~x[3] & ~x[4]) 
+    | (x[1] & ~x[2] & x[3] & ~x[4]) 
+    | (x[2] & x[3] & x[4])
 
 import pyrtl
 

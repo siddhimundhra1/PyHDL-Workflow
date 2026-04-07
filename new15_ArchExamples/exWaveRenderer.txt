@@ -1,16 +1,16 @@
-# [Keyword]: WaveRenderer Demo
+[Keyword]: WaveRenderer Demo
 
-# [Design Category]: Simulation / Trace Visualization
+[Design Category]: Simulation / Trace Visualization
 
-# [Design Function Description]:
-# Demonstrates creating clock dividers and counters in PyRTL, simulating them,
-# and rendering the resulting waveforms with different terminal-friendly rendering options.
+[Design Function Description]:
+Demonstrates creating clock dividers and counters in PyRTL, simulating them,
+and rendering the resulting waveforms with different terminal-friendly rendering options.
 
-# [Input Signal Description]:
-# None (all signals generated internally)
+[Input Signal Description]:
+None (all signals generated internally)
 
-# [Output Signal Description]:
-# Waveform traces rendered in the terminal with various styles
+[Output Signal Description]:
+Waveform traces rendered in the terminal with various styles
 
 import pyrtl
 

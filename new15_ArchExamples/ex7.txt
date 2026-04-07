@@ -1,24 +1,5 @@
-# [Keyword]: PyRTL Timing and Optimization Example
 
-# [Design Category]: Timing Analysis / Area Estimation / Circuit Optimization
 
-# [Design Function Description]:
-# This example demonstrates how to perform timing analysis, area estimation,
-# synthesis, and logic optimization on a PyRTL hardware block. It shows how
-# to inspect critical paths, estimate ASIC area, and reduce combinatorial
-# logic complexity.
-
-# [Input Signal Description]:
-# input2: 4-bit input
-
-# [Output Signal Description]:
-# output: 5-bit output wire representing const_wire + input2
-
-# [Design Detail]:
-# - Timing analysis: measures maximum combinational path length
-# - Area estimation: estimates logic and memory area in sq mm
-# - Synthesis: breaks complex logic into 1-bit operations
-# - Optimization: removes redundant logic
 
 import pyrtl
 

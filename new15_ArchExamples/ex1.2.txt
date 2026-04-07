@@ -1,30 +1,5 @@
-# [Keyword]: wire_struct and wire_matrix Example
 
-# [Design Category]: Combinational Logic
 
-# [Design Function Description]:
-# This example demonstrates structured manipulation of wide data buses using
-# `wire_struct` and `wire_matrix`. It shows how to decompose and reconstruct
-# composite signals (like pixel data) in a readable and maintainable way,
-# avoiding manual bit slicing errors.
-
-# [Input Signal Description]:
-# pixel_in: 24-bit input representing a pixel with RGB components
-# pixel_pair_in: 48-bit input representing two concatenated pixels
-
-# [Output Signal Description]:
-# pixel_out: 24-bit output after processing RGB components
-# pixel_pair_out: 48-bit output after processing pairs of pixels
-
-# [Design Detail]:
-# pixel_out = concat(
-#     (pixel_in.red + 0x11),
-#     (pixel_in.green + 0x22),
-#     (pixel_in.blue + 0x33)
-# )
-#
-# pixel_pair_out[0].red = pixel_pair_in[0].red + 0x10
-# pixel_pair_out[1] = pixel_pair_in[1] + 1
 
 import inspect
 import pyrtl

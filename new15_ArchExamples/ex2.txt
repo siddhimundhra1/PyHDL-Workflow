@@ -1,28 +1,5 @@
-# [Keyword]: Ripple Carry Counter Example
 
-# [Design Category]: Sequential Logic
 
-# [Design Function Description]:
-# This circuit implements a 3-bit counter using a ripple carry adder.
-# It demonstrates hierarchical hardware construction by composing a
-# 1-bit full adder into an N-bit ripple carry adder, and then using
-# a register to create stateful behavior (counting over clock cycles).
-
-# [Input Signal Description]:
-# None (self-contained sequential circuit with implicit clock)
-
-# [Output Signal Description]:
-# counter: 3-bit register output representing the current count (modulo 8)
-
-# [Design Detail]:
-# one_bit_add:
-#   sum = a ^ b ^ carry_in
-#   carry_out = (a & b) | (a & carry_in) | (b & carry_in)
-#
-# ripple_add:
-#   recursively applies one_bit_add across all bits
-#
-# counter_next = ripple_add(counter, 1)
 
 import pyrtl
 

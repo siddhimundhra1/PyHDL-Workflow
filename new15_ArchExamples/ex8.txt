@@ -1,25 +1,4 @@
-# [Keyword]: PyRTL Verilog Interfacing Example
 
-# [Design Category]: Verilog Import / Export / Testbench Generation
-
-# [Design Function Description]:
-# This example demonstrates importing from Verilog (BLIF), exporting PyRTL circuits
-# to Verilog, generating Verilog testbenches, and simulating traces.
-
-# [Input Signal Description]:
-# - x, y, cin : 1-bit inputs for the full adder
-# - zero      : 1-bit input to reset the counter
-
-# [Output Signal Description]:
-# - sum, cout : 1-bit outputs from the full adder
-# - counter_output : 3-bit counter output
-
-# [Design Detail]:
-# - Import a 1-bit full adder from BLIF
-# - Simulate the adder for 15 cycles with random inputs
-# - Build a 3-bit resettable counter
-# - Export counter design and testbench to Verilog
-# - Lower the counter to single-bit Verilog and optimize
 
 import io
 import random

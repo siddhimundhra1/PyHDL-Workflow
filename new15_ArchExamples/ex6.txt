@@ -1,37 +1,5 @@
-# [Keyword]: PyRTL Memory Blocks Example
 
-# [Design Category]: Sequential Logic / Memory Systems
 
-# [Design Function Description]:
-# This example demonstrates how to use `MemBlock` (read-write memory) and
-# `RomBlock` (read-only memory) in PyRTL. It shows how to perform memory
-# reads/writes with enable control, initialize memory for simulation, and
-# compare different memory implementations.
-
-# [Input Signal Description]:
-# waddr: 3-bit input write address
-# wdata: 32-bit input write data
-# we: 1-bit write enable signal
-# raddr: 3-bit read address
-
-# rom_in: 4-bit input address for ROM
-# rom_in_2: 4-bit input address for second ROM access
-
-# [Output Signal Description]:
-# rdata1, rdata2: 32-bit outputs from MemBlocks
-# validate: 1-bit output verifying matching write addresses
-
-# rom_out_1, rom_out_2: 5-bit outputs from ROM
-# rom_out_3: 5-bit output from second ROM read
-# cmp_out: 1-bit output comparing ROM outputs
-
-# [Design Detail]:
-# MemBlock:
-#   rdata = mem[raddr]
-#   mem[waddr] = wdata if we == 1
-
-# RomBlock:
-#   rom[address] = predefined_function(address)
 
 import random
 import pyrtl

@@ -1,29 +1,5 @@
-# [Keyword]: Conditional Assignment State Machine (Vending Machine)
 
-# [Design Category]: Sequential Logic
 
-# [Design Function Description]:
-# This circuit implements a finite state machine (FSM) for a vending machine.
-# The machine dispenses an item after receiving 4 tokens. If a refund is requested,
-# it returns the tokens. The design demonstrates conditional state transitions
-# using `conditional_assignment`.
-
-# [Input Signal Description]:
-# token_in: 1-bit input indicating whether a token is inserted
-# req_refund: 1-bit input requesting a refund
-
-# [Output Signal Description]:
-# dispense: 1-bit output indicating item is dispensed
-# refund: 1-bit output indicating refund is issued
-
-# [Design Detail]:
-# States:
-#   WAIT → TOK1 → TOK2 → TOK3 → DISP
-#   Any state + refund request → RFND
-#   DISP or RFND → WAIT
-#
-# dispense = (state == DISP)
-# refund = (state == RFND)
 
 import enum
 import pyrtl

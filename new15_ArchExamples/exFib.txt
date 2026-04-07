@@ -1,19 +1,4 @@
-# [Keyword]: Hardware Fibonacci Example
 
-# [Design Category]: Sequential Logic / State Machine / Registers
-
-# [Design Function Description]:
-# This example demonstrates designing a hardware Fibonacci calculator using PyRTL.
-# Iterative Fibonacci computation is translated into registers, adders, and control
-# logic to produce the `n`th Fibonacci number over multiple clock cycles.
-
-# [Input Signal Description]:
-# - n     : 8-bit input specifying which Fibonacci number to compute
-# - start : 1-bit input indicating the start of a new computation
-
-# [Output Signal Description]:
-# - fib   : 8-bit output holding the current Fibonacci number
-# - done  : 1-bit output indicating completion of computation
 
 import pyrtl
 

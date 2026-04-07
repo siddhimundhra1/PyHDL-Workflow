@@ -1,28 +1,4 @@
-# [Keyword]: PyRTL Debugging Techniques Example
 
-# [Design Category]: Debugging / Verification
-
-# [Design Function Description]:
-# This example demonstrates multiple debugging strategies in PyRTL, including:
-# tracing intermediate signals, using `probe()`, enabling debug mode, inspecting
-# WireVector stack traces, and visualizing hardware graphs. It highlights how
-# to debug hardware descriptions where definition and execution occur separately.
-
-# [Input Signal Description]:
-# in1: 8-bit input
-# in2: 8-bit input
-# in3: 8-bit input (used in addition example)
-
-# [Output Signal Description]:
-# out: 10-bit output (result of chained additions)
-# debug_out: 9-bit output for intermediate debugging
-# out1, out2: outputs used in multiplier debugging
-#
-# [Design Detail]:
-# out = kogge_stone(kogge_stone(in1, in2), in2)
-# debug_out = kogge_stone(in1, in2)
-# multout = tree_multiplier(in1, in2)
-# probe() used to inspect intermediate wires
 
 import io
 import random
