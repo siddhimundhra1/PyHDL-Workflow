@@ -1,0 +1,86 @@
+
+
+
+import pyrtl
+
+# ----------------------------
+# Step 1: Pipeline Base Class
+# ----------------------------
+
+class SimplePipeline:
+    def __init__(self):
+        self._pipeline_register_map = {}
+        self._current_stage_num = 0
+
+        # Discover and execute stage methods in order
+        stage_list = [method for method in dir(self) if method.startswith("stage")]
+        for stage in sorted(stage_list):
+            stage_method = getattr(self, stage)
+            stage_method()
+            self._current_stage_num += 1
+
+    def __getattr__(self, name):
+        try:
+            return self._pipeline_register_map[self._current_stage_num][name]
+        except KeyError as exc:
+            raise pyrtl.PyrtlError(
+                f'error, no pipeline register "{name}" defined for stage {self._current_stage_num}'
+            ) from exc
+
+    def __setattr__(self, name, value):
+        if name.startswith("_"):
+            object.__setattr__(self, name, value)
+        else:
+            next_stage = self._current_stage_num + 1
+            pipereg_id = f"{self._current_stage_num} to {next_stage}"
+            rname = f"pipereg_{pipereg_id}_name"
+
+            new_pipereg = pyrtl.Register(bitwidth=len(value), name=rname)
+
+            if next_stage not in self._pipeline_register_map:
+                self._pipeline_register_map[next_stage] = {}
+
+            self._pipeline_register_map[next_stage][name] = new_pipereg
+            new_pipereg.next <<= value
+
+# ----------------------------
+# Step 2: Define Pipeline Stages
+# ----------------------------
+
+class SimplePipelineExample(SimplePipeline):
+    def __init__(self):
+        self._loopback = pyrtl.WireVector(1, "loopback")
+        super().__init__()
+
+    def stage0(self):
+        self.n = ~self._loopback
+
+    def stage1(self):
+        self.n = self.n
+
+    def stage2(self):
+        self.n = self.n
+
+    def stage3(self):
+        self.n = self.n
+
+    def stage4(self):
+        self._loopback <<= self.n
+
+# ----------------------------
+# Step 3: Build and Inspect Hardware
+# ----------------------------
+
+simplepipeline = SimplePipelineExample()
+
+print("--- Pipeline Hardware Block ---")
+print(pyrtl.working_block())
+
+# ----------------------------
+# Step 4: Simulation
+# ----------------------------
+
+sim = pyrtl.Simulation()
+sim.step_multiple({}, nsteps=15)
+
+sim.tracer.render_trace()
