@@ -1,0 +1,23 @@
+[Keyword]: greater_than_4bit
+
+[Design Category]: Combinational Logic
+
+[Design Function Description]:
+The circuit is designed to compare two 4-bit binary numbers and determine if the first number (a) is greater than the second number (b). It uses a hierarchical approach by dividing the 4-bit numbers into two 2-bit segments and comparing them separately.
+
+[Input Signal Description]:
+- a[3:0]: A 4-bit input signal representing the first number to be compared.
+- b[3:0]: A 4-bit input signal representing the second number to be compared.
+
+[Output Signal Description]:
+- gt: A 1-bit output signal that is true (1) if the first number (a) is greater than the second number (b), otherwise false (0).
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(a, b):
+    gt = pyrtl.WireVector(bitwidth=1, name='gt')
+    gt <<= a > b
+    return gt
+```

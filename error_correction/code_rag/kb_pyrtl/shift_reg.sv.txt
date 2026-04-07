@@ -1,0 +1,41 @@
+[Keyword]: shift_reg.sv
+
+[Design Category]: Sequential Logic
+
+[Design Function Description]:
+This design implements a simple shift register with configurable depth and data type. A shift register is a sequential logic circuit that is used to store and shift data. The data is shifted in on each clock cycle, and the output is the data that has been shifted through the register.
+
+PyRTL refinement: the generic `Depth` parameter is represented as the Python argument `depth`, and the active-low reset input clears every stage to zero.
+
+[Input Signal Description]:
+- `clk_i`: Clock input signal that drives the shifting operation.
+- `rst_ni`: Asynchronous reset input signal, active low, used to reset the shift register.
+- `d_i`: Input data of type `dtype` that is to be shifted into the register.
+
+[Output Signal Description]:
+- `d_o`: Output data of type `dtype` that represents the data shifted out of the register after passing through the specified depth.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(rst_ni, d_i, depth=1):
+    bitwidth = len(d_i)
+    if depth <= 0:
+        d_o = pyrtl.WireVector(bitwidth=bitwidth, name='d_o')
+        d_o <<= d_i
+        return d_o
+
+    stages = [
+        pyrtl.Register(bitwidth=bitwidth, name=f'stage_{idx}', reset_value=0)
+        for idx in range(depth)
+    ]
+
+    for idx, stage in enumerate(stages):
+        source = d_i if idx == 0 else stages[idx - 1]
+        stage.next <<= pyrtl.select(rst_ni, truecase=source, falsecase=pyrtl.Const(0, bitwidth=bitwidth))
+
+    d_o = pyrtl.WireVector(bitwidth=bitwidth, name='d_o')
+    d_o <<= stages[-1]
+    return d_o
+```

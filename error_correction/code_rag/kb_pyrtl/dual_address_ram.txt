@@ -1,0 +1,44 @@
+[Keyword]: dual_address_ram
+
+[Design Category]: Memory Circuits
+
+[Design Function Description]:
+The design implements a dual-port RAM with separate read and write ports. It allows simultaneous read and write operations on different addresses. Port 0 is used for writing data into the RAM when enabled, and both ports can be used for reading data from the RAM when enabled.
+
+PyRTL refinement: the translation uses one `MemBlock` write port and two asynchronous read ports. Disabled outputs drive zero instead of high impedance.
+
+[Input Signal Description]:
+- `clk`: Clock signal used to synchronize write operations.
+- `wr_en`: Write enable signal for port 0, allowing data to be written to the RAM when high.
+- `data_in[7:0]`: 8-bit input data to be written into the RAM at the address specified by `addr_in_0`.
+- `addr_in_0[3:0]`: 4-bit address input for port 0, specifying the location in RAM to write data.
+- `addr_in_1[3:0]`: 4-bit address input for port 1, specifying the location in RAM to read data.
+- `port_en_0`: Enable signal for port 0, allowing read and write operations when high.
+- `port_en_1`: Enable signal for port 1, allowing read operations when high.
+
+[Output Signal Description]:
+- `data_out_0[7:0]`: 8-bit output data from port 0, providing the data stored at the address specified by `addr_in_0` when port 0 is enabled.
+- `data_out_1[7:0]`: 8-bit output data from port 1, providing the data stored at the address specified by `addr_in_1` when port 1 is enabled.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(clk, wr_en, data_in, addr_in_0, addr_in_1, port_en_0, port_en_1):
+    ram = pyrtl.MemBlock(
+        bitwidth=8,
+        addrwidth=4,
+        name='ram',
+        max_read_ports=2,
+        max_write_ports=1,
+        asynchronous=True,
+    )
+
+    ram[addr_in_0] <<= pyrtl.MemBlock.EnabledWrite(data_in, port_en_0 & wr_en)
+
+    data_out_0 = pyrtl.WireVector(bitwidth=8, name='data_out_0')
+    data_out_1 = pyrtl.WireVector(bitwidth=8, name='data_out_1')
+    data_out_0 <<= pyrtl.select(port_en_0, truecase=ram[addr_in_0], falsecase=pyrtl.Const(0, bitwidth=8))
+    data_out_1 <<= pyrtl.select(port_en_1, truecase=ram[addr_in_1], falsecase=pyrtl.Const(0, bitwidth=8))
+    return data_out_0, data_out_1
+```

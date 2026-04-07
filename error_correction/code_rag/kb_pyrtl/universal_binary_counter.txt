@@ -1,0 +1,52 @@
+[Keyword]: universal_binary_counter
+
+[Design Category]: Sequential Logic
+
+[Design Function Description]:
+This design is a universal binary counter that can count up or down based on the control signals. It supports synchronous clear, load, enable, and direction control (up or down). The counter can be parameterized to have a different bit-width (N), allowing it to count to different maximum values.
+
+PyRTL refinement: the counter width is inferred from the bitwidth of `d`, which keeps the function portable across different widths.
+
+[Input Signal Description]:
+- `clk`: Clock signal for synchronizing the counter operations.
+- `rst_n`: Active-low reset signal to initialize the counter to zero.
+- `syn_clr`: Synchronous clear signal to reset the counter to zero during normal operation.
+- `load`: Signal to load a specific value into the counter.
+- `en`: Enable signal to allow counting when high.
+- `up`: Direction control signal; when high, the counter counts up, and when low, it counts down.
+- `d[N-1:0]`: Data input for loading a specific value into the counter.
+
+[Output Signal Description]:
+- `q[N-1:0]`: Current count value of the counter.
+- `max_tick`: Output signal that goes high when the counter reaches its maximum value.
+- `min_tick`: Output signal that goes high when the counter reaches zero.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(rst_n, syn_clr, load, en, up, d):
+    width = len(d)
+    q = pyrtl.Register(bitwidth=width, name='q', reset_value=0)
+    all_ones = pyrtl.Const((1 << width) - 1, bitwidth=width)
+
+    q_plus = (q + pyrtl.Const(1, bitwidth=width))[0:width]
+    q_minus = (q - pyrtl.Const(1, bitwidth=width))[0:width]
+
+    next_q = pyrtl.select(
+        syn_clr,
+        truecase=pyrtl.Const(0, bitwidth=width),
+        falsecase=pyrtl.select(
+            load,
+            truecase=d,
+            falsecase=pyrtl.select(en & up, truecase=q_plus, falsecase=pyrtl.select(en & ~up, truecase=q_minus, falsecase=q)),
+        ),
+    )
+    q.next <<= pyrtl.select(~rst_n, truecase=pyrtl.Const(0, bitwidth=width), falsecase=next_q)
+
+    max_tick = pyrtl.WireVector(bitwidth=1, name='max_tick')
+    min_tick = pyrtl.WireVector(bitwidth=1, name='min_tick')
+    max_tick <<= q == all_ones
+    min_tick <<= q == pyrtl.Const(0, bitwidth=width)
+    return q, max_tick, min_tick
+```

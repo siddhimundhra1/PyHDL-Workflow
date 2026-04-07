@@ -1,0 +1,29 @@
+[Keyword]: Gates4
+
+[Design Category]: Combinational Logic
+
+[Design Function Description]:
+This design implements basic logic operations (AND, OR, XOR) on a 4-bit input vector. It computes the logical AND, OR, and XOR of all four input bits and outputs the results separately.
+
+[Input Signal Description]:
+in[3:0]: A 4-bit input signal where each bit can be independently set to 0 or 1. The bits are used as inputs for the AND, OR, and XOR operations.
+
+[Output Signal Description]:
+out_and: Outputs the result of the logical AND operation on all four input bits.
+out_or: Outputs the result of the logical OR operation on all four input bits.
+out_xor: Outputs the result of the logical XOR operation on all four input bits.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(in_):  # in_ corresponds to the original Verilog signal named "in"
+    out_and = pyrtl.WireVector(bitwidth=1, name='out_and')
+    out_or = pyrtl.WireVector(bitwidth=1, name='out_or')
+    out_xor = pyrtl.WireVector(bitwidth=1, name='out_xor')
+
+    out_and <<= in_[0] & in_[1] & in_[2] & in_[3]
+    out_or <<= in_[0] | in_[1] | in_[2] | in_[3]
+    out_xor <<= in_[0] ^ in_[1] ^ in_[2] ^ in_[3]
+    return out_and, out_or, out_xor
+```

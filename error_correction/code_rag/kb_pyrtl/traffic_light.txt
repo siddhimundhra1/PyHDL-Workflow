@@ -1,0 +1,71 @@
+[Keyword]: traffic_light
+
+[Design Category]: Control Circuits
+
+[Design Function Description]:
+This design implements a traffic light controller for a two-way intersection. It manages the traffic lights for two directions (A and B) by cycling through states that control the red, yellow, and green lights based on the current state and sensor inputs.
+
+PyRTL refinement: there is no explicit reset input in the original source, so the controller starts in state 0 using the register `reset_value`.
+
+[Input Signal Description]:
+- clk: Clock signal used to synchronize the state transitions.
+- Sa: Sensor input for direction A, indicating the presence of vehicles.
+- Sb: Sensor input for direction B, indicating the presence of vehicles.
+
+[Output Signal Description]:
+- Ra, Rb: Red light control signals for directions A and B, respectively.
+- Ga, Gb: Green light control signals for directions A and B, respectively.
+- Ya, Yb: Yellow light control signals for directions A and B, respectively.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(Sa, Sb):
+    state = pyrtl.Register(bitwidth=4, name='state', reset_value=0)
+
+    is0 = state == pyrtl.Const(0, bitwidth=4)
+    is1 = state == pyrtl.Const(1, bitwidth=4)
+    is2 = state == pyrtl.Const(2, bitwidth=4)
+    is3 = state == pyrtl.Const(3, bitwidth=4)
+    is4 = state == pyrtl.Const(4, bitwidth=4)
+    is5 = state == pyrtl.Const(5, bitwidth=4)
+    is6 = state == pyrtl.Const(6, bitwidth=4)
+    is7 = state == pyrtl.Const(7, bitwidth=4)
+    is8 = state == pyrtl.Const(8, bitwidth=4)
+    is9 = state == pyrtl.Const(9, bitwidth=4)
+    is10 = state == pyrtl.Const(10, bitwidth=4)
+    is11 = state == pyrtl.Const(11, bitwidth=4)
+    is12 = state == pyrtl.Const(12, bitwidth=4)
+
+    next_state = state
+    next_state = pyrtl.select(is0, truecase=pyrtl.Const(1, bitwidth=4), falsecase=next_state)
+    next_state = pyrtl.select(is1, truecase=pyrtl.Const(2, bitwidth=4), falsecase=next_state)
+    next_state = pyrtl.select(is2, truecase=pyrtl.Const(3, bitwidth=4), falsecase=next_state)
+    next_state = pyrtl.select(is3, truecase=pyrtl.Const(4, bitwidth=4), falsecase=next_state)
+    next_state = pyrtl.select(is4, truecase=pyrtl.Const(5, bitwidth=4), falsecase=next_state)
+    next_state = pyrtl.select(is5, truecase=pyrtl.select(Sb, truecase=pyrtl.Const(6, bitwidth=4), falsecase=pyrtl.Const(5, bitwidth=4)), falsecase=next_state)
+    next_state = pyrtl.select(is6, truecase=pyrtl.Const(7, bitwidth=4), falsecase=next_state)
+    next_state = pyrtl.select(is7, truecase=pyrtl.Const(8, bitwidth=4), falsecase=next_state)
+    next_state = pyrtl.select(is8, truecase=pyrtl.Const(9, bitwidth=4), falsecase=next_state)
+    next_state = pyrtl.select(is9, truecase=pyrtl.Const(10, bitwidth=4), falsecase=next_state)
+    next_state = pyrtl.select(is10, truecase=pyrtl.Const(11, bitwidth=4), falsecase=next_state)
+    next_state = pyrtl.select(is11, truecase=pyrtl.select(Sa | ~Sb, truecase=pyrtl.Const(12, bitwidth=4), falsecase=pyrtl.Const(11, bitwidth=4)), falsecase=next_state)
+    next_state = pyrtl.select(is12, truecase=pyrtl.Const(0, bitwidth=4), falsecase=next_state)
+    state.next <<= next_state
+
+    Ra = pyrtl.WireVector(bitwidth=1, name='Ra')
+    Rb = pyrtl.WireVector(bitwidth=1, name='Rb')
+    Ga = pyrtl.WireVector(bitwidth=1, name='Ga')
+    Gb = pyrtl.WireVector(bitwidth=1, name='Gb')
+    Ya = pyrtl.WireVector(bitwidth=1, name='Ya')
+    Yb = pyrtl.WireVector(bitwidth=1, name='Yb')
+
+    Ra <<= is7 | is8 | is9 | is10 | is11 | is12
+    Rb <<= is0 | is1 | is2 | is3 | is4 | is5 | is6
+    Ga <<= is0 | is1 | is2 | is3 | is4 | is5
+    Gb <<= is7 | is8 | is9 | is10 | is11
+    Ya <<= is6
+    Yb <<= is12
+    return Ra, Rb, Ga, Gb, Ya, Yb
+```

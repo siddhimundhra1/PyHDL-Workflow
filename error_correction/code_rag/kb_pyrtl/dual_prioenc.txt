@@ -1,0 +1,40 @@
+[Keyword]: dual_prioenc
+
+[Design Category]: Combinational Logic
+
+[Design Function Description]:
+The design is a dual priority encoder. It scans a 12-bit input vector to identify the positions of the first and second highest priority '1' bits. The position of the first '1' bit found is stored in the `first` output, and the position of the second '1' bit is stored in the `second` output.
+
+[Input Signal Description]:
+`in[11:0]`: A 12-bit input signal where each bit can be either '0' or '1'. The circuit will prioritize the bits from the most significant to the least significant to determine the positions of the first and second '1' bits.
+
+[Output Signal Description]:
+`first[3:0]`: A 4-bit output signal representing the position (1-based index) of the first '1' bit found in the input.
+`second[3:0]`: A 4-bit output signal representing the position (1-based index) of the second '1' bit found in the input.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(in_):  # in_ corresponds to the original Verilog signal named "in"
+    first_expr = pyrtl.Const(0, bitwidth=4)
+    second_expr = pyrtl.Const(0, bitwidth=4)
+    found_first = pyrtl.Const(0, bitwidth=1)
+    found_second = pyrtl.Const(0, bitwidth=1)
+
+    for idx in range(11, -1, -1):
+        bit = in_[idx]
+        pos = pyrtl.Const(idx + 1, bitwidth=4)
+        assign_first = bit & ~found_first
+        assign_second = bit & found_first & ~found_second
+        first_expr = pyrtl.select(assign_first, truecase=pos, falsecase=first_expr)
+        second_expr = pyrtl.select(assign_second, truecase=pos, falsecase=second_expr)
+        found_first = found_first | bit
+        found_second = found_second | assign_second
+
+    first = pyrtl.WireVector(bitwidth=4, name='first')
+    second = pyrtl.WireVector(bitwidth=4, name='second')
+    first <<= first_expr
+    second <<= second_expr
+    return first, second
+```

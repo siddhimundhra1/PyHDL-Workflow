@@ -1,0 +1,28 @@
+[Keyword]: Dff16e
+
+[Design Category]: Sequential Logic
+
+[Design Function Description]:
+This design is a byte-enable register with asynchronous reset. It stores a 16-bit input data `d` into the output `q` based on the byte-enable signal `byteena`. The register updates its stored value on the rising edge of the clock `clk`, and it can reset to zero asynchronously when `resetn` is low.
+
+[Input Signal Description]:
+- `clk`: Clock signal used to synchronize the data storage.
+- `resetn`: Active-low asynchronous reset signal. When low, it resets the output `q` to zero.
+- `byteena[1:0]`: 2-bit byte-enable signal. `byteena[1]` controls the update of the upper byte (bits 15 to 8) of `q`, and `byteena[0]` controls the update of the lower byte (bits 7 to 0) of `q`.
+- `d[15:0]`: 16-bit input data to be stored in the register.
+
+[Output Signal Description]:
+- `q[15:0]`: 16-bit output that holds the stored data. It updates based on the `byteena` signal and the input `d` on the rising edge of `clk`, or resets to zero when `resetn` is low.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(resetn, byteena, d):
+    q = pyrtl.Register(bitwidth=16, name='q', reset_value=0)
+    upper_next = pyrtl.select(byteena[1], truecase=d[8:16], falsecase=q[8:16])
+    lower_next = pyrtl.select(byteena[0], truecase=d[0:8], falsecase=q[0:8])
+    merged_next = pyrtl.concat(upper_next, lower_next)
+    q.next <<= pyrtl.select(~resetn, truecase=pyrtl.Const(0, bitwidth=16), falsecase=merged_next)
+    return q
+```

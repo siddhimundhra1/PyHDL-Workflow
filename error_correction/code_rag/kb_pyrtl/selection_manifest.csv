@@ -1,0 +1,51 @@
+source_file,target_file,focus_area
+Reduction.txt,Reduction.txt,vector reduction and parity
+7Vector1.txt,7Vector1.txt,vector slicing and packing
+Vectorgates.txt,Vectorgates.txt,bitwise and logical vector operations
+Gates4.txt,Gates4.txt,reduction-style boolean operations
+Mux2to1.txt,Mux2to1.txt,single-bit mux pattern
+Mux_8_to_1.txt,Mux_8_to_1.txt,multi-input mux construction
+Mux256to1.txt,Mux256to1.txt,indexed bit selection
+binary_decoder_2x4.txt,binary_decoder_2x4.txt,small decoder pattern
+binary_decoder_3x8.txt,binary_decoder_3x8.txt,medium decoder pattern
+binary_decoder_4x16.txt,binary_decoder_4x16.txt,wide decoder pattern
+dual_prioenc.txt,dual_prioenc.txt,priority encoding
+dual_comparator.txt,dual_comparator.txt,signed versus unsigned comparison
+greater_than_4bit.txt,greater_than_4bit.txt,comparator logic
+adder.txt,adder.txt,basic arithmetic
+adder32.txt,adder32.txt,wide arithmetic with carry
+carry_save_adder.txt,carry_save_adder.txt,multi-operand addition
+carry_look_ahead_adder.txt,carry_look_ahead_adder.txt,adder family coverage
+bcd_adder.txt,bcd_adder.txt,single-digit BCD arithmetic
+Bcdadd4.txt,Bcdadd4.txt,multi-digit BCD arithmetic
+Popcount3.txt,Popcount3.txt,small population count
+Popcount255.txt,Popcount255.txt,wide population count
+barrel_shifter_8bit.txt,barrel_shifter_8bit.txt,logical shifting stages
+Rotate_8.txt,Rotate_8.txt,bidirectional rotation
+Rotate_16.txt,Rotate_16.txt,wide rotation network
+dual_address_rom.txt,dual_address_rom.txt,multi-port ROM access
+dual_address_ram.txt,dual_address_ram.txt,dual-address RAM access
+Dff.txt,Dff.txt,single-bit register
+Dff8.txt,Dff8.txt,wide register
+Dff8r.txt,Dff8r.txt,register with reset
+Dff16e.txt,Dff16e.txt,byte-enable register
+muxdff.txt,muxdff.txt,register with load-select path
+Count10.txt,Count10.txt,modulo counter
+Count15.txt,Count15.txt,binary wraparound counter
+Count1to10.txt,Count1to10.txt,non-zero-start counter
+Countbcd.txt,Countbcd.txt,cascaded BCD counter
+bcd_counter.txt,bcd_counter.txt,edge-triggered BCD counting
+alt_bcd_counter.txt,alt_bcd_counter.txt,clock-divided BCD counting
+timer.txt,timer.txt,countdown timer
+period_counter.txt,period_counter.txt,measurement FSM
+universal_binary_counter.txt,universal_binary_counter.txt,parameterized control counter
+shift_reg.sv.txt,shift_reg.sv.txt,parameterized shift register
+Universal_shift_reg.txt,Universal_shift_reg.txt,universal shift-register control
+lfsr.txt,lfsr.txt,basic LFSR
+Lfsr5.txt,Lfsr5.txt,custom feedback LFSR
+edgecapture.txt,edgecapture.txt,sticky falling-edge capture
+Edgedetect.txt,Edgedetect.txt,vector rising-edge detection
+dual_edge_detector_simpler.txt,dual_edge_detector_simpler.txt,dual-edge detection
+moore.txt,moore.txt,simple FSM output pattern
+traffic_light.txt,traffic_light.txt,controller FSM
+Fsm serial.txt,Fsm serial.txt,FSM with explicit counter

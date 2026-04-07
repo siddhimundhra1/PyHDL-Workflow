@@ -1,0 +1,36 @@
+[Keyword]: carry_save_adder
+
+[Design Category]: Arithmetic Circuits
+
+[Design Function Description]:
+The design implements a carry-save adder (CSA) that adds four 4-bit numbers (a, b, c, and d) and produces a 5-bit sum and a carry-out. The CSA is a type of digital adder used to compute the sum of three or more n-bit numbers in binary. It is particularly useful in multi-operand addition scenarios, such as in digital signal processing and computer arithmetic.
+
+[Input Signal Description]:
+- a[3:0]: A 4-bit input operand.
+- b[3:0]: A 4-bit input operand.
+- c[3:0]: A 4-bit input operand.
+- d[3:0]: A 4-bit input operand.
+
+These inputs represent the four numbers to be added together.
+
+[Output Signal Description]:
+- sum[4:0]: A 5-bit output representing the sum of the four input operands.
+- cout: A 1-bit output representing the carry-out from the most significant bit of the addition.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(a, b, c, d):
+    total = (
+        pyrtl.concat(pyrtl.Const(0, bitwidth=2), a)
+        + pyrtl.concat(pyrtl.Const(0, bitwidth=2), b)
+        + pyrtl.concat(pyrtl.Const(0, bitwidth=2), c)
+        + pyrtl.concat(pyrtl.Const(0, bitwidth=2), d)
+    )
+    sum_ = pyrtl.WireVector(bitwidth=5, name='sum')
+    cout = pyrtl.WireVector(bitwidth=1, name='cout')
+    sum_ <<= total[0:5]
+    cout <<= total[5]
+    return sum_, cout
+```

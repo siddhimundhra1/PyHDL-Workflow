@@ -1,0 +1,39 @@
+[Keyword]: bcd_adder
+
+[Design Category]: Arithmetic Circuits
+
+[Design Function Description]:
+The design is a Binary Coded Decimal (BCD) adder. It takes two 4-bit BCD numbers and an optional carry-in bit as inputs, and produces a 4-bit BCD sum and a carry-out bit. If the sum of the inputs exceeds 9, it adjusts the result by adding 6 to ensure the output remains a valid BCD number.
+
+[Input Signal Description]:
+- a[3:0]: A 4-bit input representing the first BCD number.
+- b[3:0]: A 4-bit input representing the second BCD number.
+- cin: A 1-bit input representing the carry-in from a previous addition.
+
+[Output Signal Description]:
+- sum[3:0]: A 4-bit output representing the BCD sum of the inputs.
+- cout: A 1-bit output representing the carry-out, indicating if the sum exceeded the BCD range.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(a, b, cin):
+    temp = (
+        pyrtl.concat(pyrtl.Const(0, bitwidth=1), a)
+        + pyrtl.concat(pyrtl.Const(0, bitwidth=1), b)
+        + pyrtl.concat(pyrtl.Const(0, bitwidth=4), cin)
+    )
+    needs_correction = temp > pyrtl.Const(9, bitwidth=5)
+    corrected = (temp + pyrtl.Const(6, bitwidth=5))[0:5]
+
+    sum_ = pyrtl.WireVector(bitwidth=4, name='sum')
+    cout = pyrtl.WireVector(bitwidth=1, name='cout')
+    sum_ <<= pyrtl.select(needs_correction, truecase=corrected[0:4], falsecase=temp[0:4])
+    cout <<= pyrtl.select(
+        needs_correction,
+        truecase=pyrtl.Const(1, bitwidth=1),
+        falsecase=pyrtl.Const(0, bitwidth=1),
+    )
+    return sum_, cout
+```

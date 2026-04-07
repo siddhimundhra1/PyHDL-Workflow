@@ -1,0 +1,23 @@
+[Keyword]: Dff
+
+[Design Category]: Sequential Logic
+
+[Design Function Description]:
+This design is a simple D flip-flop. It captures the value of the input signal 'd' on the rising edge of the clock signal 'clk' and outputs it as 'q'. The output 'q' retains its value until the next rising edge of 'clk'.
+
+[Input Signal Description]:
+clk: Clock signal used to synchronize the data capture. The flip-flop captures the input 'd' on the rising edge of this clock.
+d: Data input signal that is captured by the flip-flop on the rising edge of the clock.
+
+[Output Signal Description]:
+q: The output signal that holds the value of the input 'd' after the rising edge of the clock. It retains this value until the next rising edge of the clock.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(d):
+    q = pyrtl.Register(bitwidth=1, name='q', reset_value=0)
+    q.next <<= d
+    return q
+```

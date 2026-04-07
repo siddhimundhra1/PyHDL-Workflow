@@ -1,0 +1,29 @@
+[Keyword]: dual_comparator
+
+[Design Category]: Combinational Logic
+
+[Design Function Description]:
+The circuit is a dual comparator that compares two 8-bit numbers, `a` and `b`. It can perform both signed and unsigned comparisons based on the `mode` input. If `mode` is high (1), it performs a signed comparison; if `mode` is low (0), it performs an unsigned comparison. The output `agtb` indicates whether `a` is greater than `b`.
+
+[Input Signal Description]:
+- `a[7:0]`: An 8-bit input signal representing the first number to be compared.
+- `b[7:0]`: An 8-bit input signal representing the second number to be compared.
+- `mode`: A 1-bit input signal that determines the type of comparison. If `mode` is 1, a signed comparison is performed; if `mode` is 0, an unsigned comparison is performed.
+
+[Output Signal Description]:
+- `agtb`: A 1-bit output signal that indicates the result of the comparison. It is high (1) if `a` is greater than `b` according to the selected comparison mode, and low (0) otherwise.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(a, b, mode):
+    sign_a = a[7]
+    sign_b = b[7]
+    signed_gt = ((~sign_a) & sign_b) | ((sign_a == sign_b) & (a > b))
+    unsigned_gt = a > b
+
+    agtb = pyrtl.WireVector(bitwidth=1, name='agtb')
+    agtb <<= pyrtl.select(mode, truecase=signed_gt, falsecase=unsigned_gt)
+    return agtb
+```

@@ -1,0 +1,35 @@
+[Keyword]: moore
+
+[Design Category]: Sequential Logic
+
+[Design Function Description]:
+This design implements a Moore state machine that detects a sequence of two consecutive '1's in the input stream. The state machine has three states: `zero`, `one1`, and `two1s`. The output is asserted when the state machine reaches the `two1s` state, indicating that the sequence "11" has been detected.
+
+[Input Signal Description]:
+- `clk`: Clock signal used to synchronize the state transitions.
+- `reset`: Asynchronous reset signal to initialize the state machine to the `zero` state.
+- `in`: Input signal that the state machine monitors for the sequence "11".
+
+[Output Signal Description]:
+- `out`: Output signal that is asserted (set to 1) when the state machine detects the sequence "11" in the input stream. It remains 0 otherwise.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(reset, in_):  # in_ corresponds to the original Verilog signal named "in"
+    zero = pyrtl.Const(0, bitwidth=2)
+    one1 = pyrtl.Const(1, bitwidth=2)
+    two1s = pyrtl.Const(2, bitwidth=2)
+
+    state = pyrtl.Register(bitwidth=2, name='state', reset_value=0)
+    next_state = state
+    next_state = pyrtl.select(state == zero, truecase=pyrtl.select(in_, truecase=one1, falsecase=zero), falsecase=next_state)
+    next_state = pyrtl.select(state == one1, truecase=pyrtl.select(in_, truecase=two1s, falsecase=zero), falsecase=next_state)
+    next_state = pyrtl.select(state == two1s, truecase=pyrtl.select(in_, truecase=two1s, falsecase=zero), falsecase=next_state)
+    state.next <<= pyrtl.select(reset, truecase=zero, falsecase=next_state)
+
+    out = pyrtl.WireVector(bitwidth=1, name='out')
+    out <<= state == two1s
+    return out
+```

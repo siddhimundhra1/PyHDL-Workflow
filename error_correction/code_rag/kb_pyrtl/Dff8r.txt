@@ -1,0 +1,24 @@
+[Keyword]: Dff8r
+
+[Design Category]: Sequential Logic
+
+[Design Function Description]:
+This design is an 8-bit synchronous register with a synchronous reset. It captures the input data `d` on the rising edge of the clock `clk` and outputs it as `q`. If the `reset` signal is high during a clock edge, the output `q` is reset to 0.
+
+[Input Signal Description]:
+- `clk`: Clock signal used to synchronize the data capture.
+- `reset`: Synchronous reset signal. When high, it resets the output `q` to 0 on the next rising edge of `clk`.
+- `d[7:0]`: 8-bit data input that is captured and stored in the register on the rising edge of `clk` when `reset` is low.
+
+[Output Signal Description]:
+- `q[7:0]`: 8-bit output that holds the value of the input `d` after being captured on the rising edge of `clk`. It is reset to 0 when `reset` is high.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(reset, d):
+    q = pyrtl.Register(bitwidth=8, name='q', reset_value=0)
+    q.next <<= pyrtl.select(reset, truecase=pyrtl.Const(0, bitwidth=8), falsecase=d)
+    return q
+```
