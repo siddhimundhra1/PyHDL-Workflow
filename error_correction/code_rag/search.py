@@ -18,7 +18,7 @@ def vector_search(query: str, k = 1):
             file_data = metadata[idx]
             results.append(file_data['content'])
         else:
-            print(f"Warning: Index {idx} is out of bounds for metadata with length {len(get_metadata())}")
+            print(f"Warning: Index {idx} is out of bounds for metadata with length {len(metadata)}")
     return results
 
 def keyword_search(query: str, k = 1):

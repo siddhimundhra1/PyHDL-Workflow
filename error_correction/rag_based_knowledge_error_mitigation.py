@@ -27,7 +27,7 @@ def rag_based_knowledge_error_mitigation(llm: ChatModel, description: str):
         {"role": "user", "content": user_prompt}
     ]
     response = llm.generate(messages)
-    design = parse_code_block(response, "PyRTL")
+    design = parse_code_block(response, "python")
     # print(example_prompt)
     # print(design)
 
@@ -45,4 +45,4 @@ if __name__ == "__main__":
     
     with open(f"{input_path}/design.py", "w", encoding = 'utf-8', errors = 'ignore') as file: file.write(corrected_design)
     print(corrected_design)
-    print(example_prompt)
+    # print(example_prompt)

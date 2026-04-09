@@ -7,8 +7,11 @@ from sentence_transformers import SentenceTransformer
 import torch
 import logging
 
-model = SentenceTransformer("Qwen/Qwen3-Embedding-0.6B")
-EMBEDDING_DIM = 1024
+EMBEDDING_MODEL_NAME = "BAAI/bge-large-en-v1.5"
+
+
+model = SentenceTransformer(EMBEDDING_MODEL_NAME)
+EMBEDDING_DIM = model.get_sentence_embedding_dimension()
 
 index = faiss.IndexFlatL2(EMBEDDING_DIM)
 metadata = []

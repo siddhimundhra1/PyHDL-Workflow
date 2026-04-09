@@ -2,8 +2,9 @@ import time
 import os
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
-from CodeRAG.index import add_to_index, save_index
-from CodeRAG.embeddings import generate_embeddings
+# from CodeRAG.index import add_to_index, save_index
+# from CodeRAG.embeddings import generate_embeddings
+from .index import add_to_index, save_index, generate_embeddings
 from config import *
 
 class CodeChangeHander(FileSystemEventHandler):

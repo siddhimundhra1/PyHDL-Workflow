@@ -2,7 +2,7 @@
 import os
 import re
 from model import ChatModel
-from utils import parse_code_block, extract_module_header, run_design
+from utils import parse_code_block, run_design
 
 description_refinement_rules = """
 As a PyRTL hardware-design understanding expert, you will be given a natural language module description.
@@ -104,7 +104,12 @@ def rule_based_description_refinement(llm: ChatModel, description: str, task_pro
     else:
         refined_description = description
 
-    module_header = extract_module_header(description)
+    interface_note = """
+    PyRTL interface requirements:
+    - The top-level function must be named TopModule.
+    - The function arguments must match the described input ports.
+    - The returned values must match the described output ports.
+    """
 
     system_prompt = f"""
     As a PyRTL programming expert, you need to complete PyRTL code based on user's prompt.
@@ -116,7 +121,7 @@ def rule_based_description_refinement(llm: ChatModel, description: str, task_pro
 
     user_prompt = f"""
     {refined_description}
-    {module_header}
+    {interface_note}
     """
 
     messages = [
@@ -127,7 +132,7 @@ def rule_based_description_refinement(llm: ChatModel, description: str, task_pro
     response = llm.generate(messages)
     module_block = parse_code_block(response, "python")
 
-    design = module_header + module_block
+    design = module_block.strip()
 
     return design, refined_description
 
@@ -148,17 +153,18 @@ if __name__ == "__main__":
     with open(f"{input_path}/description.txt", "r", encoding='utf-8', errors='ignore') as file:
         description = file.read()
 
-    with open(f"{input_path}/ref.sv", "r", encoding='utf-8', errors='ignore') as file:
+    with open(f"{input_path}/ref.py", "r", encoding='utf-8', errors='ignore') as file:
         ref = file.read()
 
-    with open(f"{input_path}/testbench.sv", "r", encoding='utf-8', errors='ignore') as file:
+    with open(f"{input_path}/testbench.py", "r", encoding='utf-8', errors='ignore') as file:
         testbench = file.read()
 
-    #corrected_design, example_prompt = rule_based_description_refinement(llm, description)
+    design, refined_description = rule_based_description_refinement(
+        llm, description, task_prompt
+    )
 
-    #with open(f"{input_path}/design.sv", "w", encoding='utf-8', errors='ignore') as file:
-     #   file.write(design)
-    design, refined_description =  rule_based_description_refinement(llm, description, task_prompt)
+    with open(f"{input_path}/design.py", "w", encoding='utf-8', errors='ignore') as file:
+        file.write(design)
 
     print(design)
     print(refined_description)
