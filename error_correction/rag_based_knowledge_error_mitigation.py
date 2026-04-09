@@ -3,10 +3,10 @@ from utils import extract_module_header, parse_code_block, run_design
 from model import ChatModel
 
 system_prompt = """
-You are an excellent Verilog programming expert.  
+You are an excellent PyRTL programming expert.  
 you will be given programming design example and user's design description,
 
-You should refer to the example exactly line by line to complete the Verilog code implementation.
+You should refer to the example exactly line by line to complete the PyRTL code implementation.
 Specifically, you need to learn the implementation details of example from start to finish.
 At the same time, your design needs to meet user requirements.
 
@@ -27,7 +27,7 @@ def rag_based_knowledge_error_mitigation(llm: ChatModel, description: str):
         {"role": "user", "content": user_prompt}
     ]
     response = llm.generate(messages)
-    design = parse_code_block(response, "verilog")
+    design = parse_code_block(response, "PyRTL")
     # print(example_prompt)
     # print(design)
 
@@ -36,13 +36,13 @@ def rag_based_knowledge_error_mitigation(llm: ChatModel, description: str):
     
 if __name__ == "__main__":
     input_path = "./input"
-    llm = ChatModel(model_name = "/public/Qwen2.5-Coder-32B-Instruct", temperature = 0.1, local = True)
+    llm = ChatModel(model_name = "gemini-3-flash-preview", temperature = 0.1, local = False)
     
     with open(f"{input_path}/description.txt", "r", encoding = 'utf-8', errors = 'ignore') as file: description = file.read()
-    with open(f"{input_path}/ref.sv", "r", encoding = 'utf-8', errors = 'ignore') as file: ref = file.read()
-    with open(f"{input_path}/testbench.sv", "r", encoding = 'utf-8', errors = 'ignore') as file: testbench = file.read()
+    with open(f"{input_path}/ref.py", "r", encoding = 'utf-8', errors = 'ignore') as file: ref = file.read()
+    with open(f"{input_path}/testbench.py", "r", encoding = 'utf-8', errors = 'ignore') as file: testbench = file.read()
     corrected_design, example_prompt = rag_based_knowledge_error_mitigation(llm, description)
     
-    with open(f"{input_path}/design.sv", "w", encoding = 'utf-8', errors = 'ignore') as file: file.write(corrected_design)
+    with open(f"{input_path}/design.py", "w", encoding = 'utf-8', errors = 'ignore') as file: file.write(corrected_design)
     print(corrected_design)
     print(example_prompt)
