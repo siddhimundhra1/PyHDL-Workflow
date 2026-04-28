@@ -1,0 +1,25 @@
+[Keyword]: Edgedetect
+
+[Design Category]: Sequential Logic
+
+[Design Function Description]:
+The circuit detects positive edges on each bit of an 8-bit input signal. It outputs a corresponding 8-bit signal where each bit indicates whether a positive edge (a transition from 0 to 1) has occurred on the respective input bit.
+
+[Input Signal Description]:
+- clk: Clock signal used to synchronize the detection of positive edges.
+- in[7:0]: 8-bit input signal on which positive edge detection is performed.
+
+[Output Signal Description]:
+- pedge[7:0]: 8-bit output signal where each bit is set to 1 if a positive edge is detected on the corresponding input bit, otherwise it is set to 0.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(in_):  # in_ corresponds to the original Verilog signal named "in"
+    prev = pyrtl.Register(bitwidth=8, name='prev', reset_value=0)
+    pedge = pyrtl.WireVector(bitwidth=8, name='pedge')
+    pedge <<= in_ & ~prev
+    prev.next <<= in_
+    return pedge
+```

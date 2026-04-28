@@ -1,0 +1,47 @@
+[Keyword]: dual_address_rom
+
+[Design Category]: Memory Circuits
+
+[Design Function Description]:
+The design is a dual-port ROM (Read-Only Memory) module that allows reading from two separate addresses simultaneously. It includes a testbench to verify its functionality. The ROM is initialized with predefined data values, and the module supports enabling and disabling of each port independently.
+
+PyRTL refinement: `wr_en` is treated as a read qualifier for port 0, not as a real ROM write signal. Disabled outputs drive zero because PyRTL does not model high-impedance outputs in this style.
+
+[Input Signal Description]:
+- `clk`: Clock signal used to synchronize the operations within the ROM.
+- `wr_en`: Write enable signal, although typically ROMs do not support writing; this signal is used here to control the address loading.
+- `addr_in_0`: 4-bit address input for port 0, used to select which data to read from the ROM.
+- `addr_in_1`: 4-bit address input for port 1, used to select which data to read from the ROM.
+- `port_en_0`: Enable signal for port 0, allowing data to be read from the ROM when high.
+- `port_en_1`: Enable signal for port 1, allowing data to be read from the ROM when high.
+
+[Output Signal Description]:
+- `data_out_0`: 8-bit data output from port 0, providing the data stored at the address specified by `addr_in_0` when `port_en_0` is high.
+- `data_out_1`: 8-bit data output from port 1, providing the data stored at the address specified by `addr_in_1` when `port_en_1` is high.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(clk, wr_en, addr_in_0, addr_in_1, port_en_0, port_en_1):
+    romdata = [
+        0x24, 0x23, 0xE2, 0x21,
+        0x45, 0xAE, 0xCB, 0x00,
+        0xA3, 0x2A, 0xEC, 0x22,
+        0x40, 0xA0, 0x0C, 0x00,
+    ]
+    rom = pyrtl.RomBlock(
+        bitwidth=8,
+        addrwidth=4,
+        romdata=romdata,
+        name='rom',
+        max_read_ports=2,
+        asynchronous=True,
+    )
+
+    data_out_0 = pyrtl.WireVector(bitwidth=8, name='data_out_0')
+    data_out_1 = pyrtl.WireVector(bitwidth=8, name='data_out_1')
+    data_out_0 <<= pyrtl.select(port_en_0 & wr_en, truecase=rom[addr_in_0], falsecase=pyrtl.Const(0, bitwidth=8))
+    data_out_1 <<= pyrtl.select(port_en_1, truecase=rom[addr_in_1], falsecase=pyrtl.Const(0, bitwidth=8))
+    return data_out_0, data_out_1
+```

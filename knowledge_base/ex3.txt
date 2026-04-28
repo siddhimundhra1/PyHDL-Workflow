@@ -1,0 +1,92 @@
+
+
+
+import enum
+import pyrtl
+
+# ----------------------------
+# Step 1: Define Inputs, Outputs, State
+# ----------------------------
+
+token_in = pyrtl.Input(1, "token_in")
+req_refund = pyrtl.Input(1, "req_refund")
+
+dispense = pyrtl.Output(1, "dispense")
+refund = pyrtl.Output(1, "refund")
+
+state = pyrtl.Register(3, "state")
+
+# ----------------------------
+# Step 2: Define States
+# ----------------------------
+
+class State(enum.IntEnum):
+    WAIT = 0
+    TOK1 = 1
+    TOK2 = 2
+    TOK3 = 3
+    DISP = 4
+    RFND = 5
+
+# ----------------------------
+# Step 3: Define FSM Transitions
+# ----------------------------
+
+with pyrtl.conditional_assignment:
+    # Highest priority: refund request
+    with req_refund:
+        state.next |= State.RFND
+
+    # Token insertion logic
+    with token_in:
+        with state == State.WAIT:
+            state.next |= State.TOK1
+        with state == State.TOK1:
+            state.next |= State.TOK2
+        with state == State.TOK2:
+            state.next |= State.TOK3
+        with state == State.TOK3:
+            state.next |= State.DISP
+        with pyrtl.otherwise:
+            state.next |= State.RFND
+
+    # Automatic reset transitions
+    with (state == State.DISP) | (state == State.RFND):
+        state.next |= State.WAIT
+
+# ----------------------------
+# Step 4: Output Logic
+# ----------------------------
+
+dispense <<= state == State.DISP
+refund <<= state == State.RFND
+
+# ----------------------------
+# Step 5: Simulation
+# ----------------------------
+
+sim = pyrtl.Simulation()
+
+sim_inputs = {
+    "token_in": "0010100111010000",
+    "req_refund": "1100010000000000"
+}
+
+sim.step_multiple(sim_inputs)
+
+sim.tracer.render_trace(
+    trace_list=["token_in", "req_refund", "state", "dispense", "refund"],
+    repr_per_name={"state": pyrtl.enum_name(State)},
+)
+
+# ----------------------------
+# Step 6: Verification
+# ----------------------------
+
+expected_sim_outputs = {
+    "dispense": "0000000000001000",
+    "refund": "0111001000000000"
+}
+
+sim = pyrtl.Simulation()
+sim.step_multiple(sim_inputs, expected_sim_outputs)

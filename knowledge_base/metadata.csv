@@ -1,0 +1,1930 @@
+keyword,content,filename,filepath
+edgecapture,"[Keyword]: edgecapture
+
+[Design Category]: Sequential Logic
+
+[Design Function Description]:
+This design detects the falling edges of a 32-bit input signal. It stores the result of the detected falling edges in a 32-bit output register. A falling edge is detected when a bit changes from 1 to 0.
+
+PyRTL refinement: the previous-sample register continues tracking the input during reset handling so that post-reset falling-edge capture matches the intended behavior.
+
+[Input Signal Description]:
+- clk: Clock signal that triggers the sequential logic on its rising edge.
+- reset: Active-high reset signal that initializes the output to zero.
+- in[31:0]: 32-bit input signal that is processed and stored on each clock cycle.
+
+[Output Signal Description]:
+- out[31:0]: 32-bit output signal that is updated based on the bitwise operation involving the current and previous input values.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(reset, in_):  # in_ corresponds to the original Verilog signal named ""in""
+    d_last = pyrtl.Register(bitwidth=32, name='d_last', reset_value=0)
+    out = pyrtl.Register(bitwidth=32, name='out', reset_value=0)
+
+    d_last.next <<= in_
+    out.next <<= pyrtl.select(
+        reset,
+        truecase=pyrtl.Const(0, bitwidth=32),
+        falsecase=out | ((~in_) & d_last),
+    )
+    return out
+```
+",<_io.TextIOWrapper name='./knowledge_base/edgecapture.txt' mode='r' encoding='utf-8'>,edgecapture.txt
+universal_binary_counter,"[Keyword]: universal_binary_counter
+
+[Design Category]: Sequential Logic
+
+[Design Function Description]:
+This design is a universal binary counter that can count up or down based on the control signals. It supports synchronous clear, load, enable, and direction control (up or down). The counter can be parameterized to have a different bit-width (N), allowing it to count to different maximum values.
+
+PyRTL refinement: the counter width is inferred from the bitwidth of `d`, which keeps the function portable across different widths.
+
+[Input Signal Description]:
+- `clk`: Clock signal for synchronizing the counter operations.
+- `rst_n`: Active-low reset signal to initialize the counter to zero.
+- `syn_clr`: Synchronous clear signal to reset the counter to zero during normal operation.
+- `load`: Signal to load a specific value into the counter.
+- `en`: Enable signal to allow counting when high.
+- `up`: Direction control signal; when high, the counter counts up, and when low, it counts down.
+- `d[N-1:0]`: Data input for loading a specific value into the counter.
+
+[Output Signal Description]:
+- `q[N-1:0]`: Current count value of the counter.
+- `max_tick`: Output signal that goes high when the counter reaches its maximum value.
+- `min_tick`: Output signal that goes high when the counter reaches zero.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(rst_n, syn_clr, load, en, up, d):
+    width = len(d)
+    q = pyrtl.Register(bitwidth=width, name='q', reset_value=0)
+    all_ones = pyrtl.Const((1 << width) - 1, bitwidth=width)
+
+    q_plus = (q + pyrtl.Const(1, bitwidth=width))[0:width]
+    q_minus = (q - pyrtl.Const(1, bitwidth=width))[0:width]
+
+    next_q = pyrtl.select(
+        syn_clr,
+        truecase=pyrtl.Const(0, bitwidth=width),
+        falsecase=pyrtl.select(
+            load,
+            truecase=d,
+            falsecase=pyrtl.select(en & up, truecase=q_plus, falsecase=pyrtl.select(en & ~up, truecase=q_minus, falsecase=q)),
+        ),
+    )
+    q.next <<= pyrtl.select(~rst_n, truecase=pyrtl.Const(0, bitwidth=width), falsecase=next_q)
+
+    max_tick = pyrtl.WireVector(bitwidth=1, name='max_tick')
+    min_tick = pyrtl.WireVector(bitwidth=1, name='min_tick')
+    max_tick <<= q == all_ones
+    min_tick <<= q == pyrtl.Const(0, bitwidth=width)
+    return q, max_tick, min_tick
+```
+",<_io.TextIOWrapper name='./knowledge_base/universal_binary_counter.txt' mode='r' encoding='utf-8'>,universal_binary_counter.txt
+dual_address_ram,"[Keyword]: dual_address_ram
+
+[Design Category]: Memory Circuits
+
+[Design Function Description]:
+The design implements a dual-port RAM with separate read and write ports. It allows simultaneous read and write operations on different addresses. Port 0 is used for writing data into the RAM when enabled, and both ports can be used for reading data from the RAM when enabled.
+
+PyRTL refinement: the translation uses one `MemBlock` write port and two asynchronous read ports. Disabled outputs drive zero instead of high impedance.
+
+[Input Signal Description]:
+- `clk`: Clock signal used to synchronize write operations.
+- `wr_en`: Write enable signal for port 0, allowing data to be written to the RAM when high.
+- `data_in[7:0]`: 8-bit input data to be written into the RAM at the address specified by `addr_in_0`.
+- `addr_in_0[3:0]`: 4-bit address input for port 0, specifying the location in RAM to write data.
+- `addr_in_1[3:0]`: 4-bit address input for port 1, specifying the location in RAM to read data.
+- `port_en_0`: Enable signal for port 0, allowing read and write operations when high.
+- `port_en_1`: Enable signal for port 1, allowing read operations when high.
+
+[Output Signal Description]:
+- `data_out_0[7:0]`: 8-bit output data from port 0, providing the data stored at the address specified by `addr_in_0` when port 0 is enabled.
+- `data_out_1[7:0]`: 8-bit output data from port 1, providing the data stored at the address specified by `addr_in_1` when port 1 is enabled.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(clk, wr_en, data_in, addr_in_0, addr_in_1, port_en_0, port_en_1):
+    ram = pyrtl.MemBlock(
+        bitwidth=8,
+        addrwidth=4,
+        name='ram',
+        max_read_ports=2,
+        max_write_ports=1,
+        asynchronous=True,
+    )
+
+    ram[addr_in_0] <<= pyrtl.MemBlock.EnabledWrite(data_in, port_en_0 & wr_en)
+
+    data_out_0 = pyrtl.WireVector(bitwidth=8, name='data_out_0')
+    data_out_1 = pyrtl.WireVector(bitwidth=8, name='data_out_1')
+    data_out_0 <<= pyrtl.select(port_en_0, truecase=ram[addr_in_0], falsecase=pyrtl.Const(0, bitwidth=8))
+    data_out_1 <<= pyrtl.select(port_en_1, truecase=ram[addr_in_1], falsecase=pyrtl.Const(0, bitwidth=8))
+    return data_out_0, data_out_1
+```
+",<_io.TextIOWrapper name='./knowledge_base/dual_address_ram.txt' mode='r' encoding='utf-8'>,dual_address_ram.txt
+Universal_shift_reg,"[Keyword]: Universal_shift_reg
+
+[Design Category]: Sequential Logic
+
+[Design Function Description]:
+The design is a 4-bit universal shift register. It can perform various operations such as hold, shift left, shift right, parallel load, and more, based on the control signals. The shift register uses multiplexers to select the operation and D flip-flops to store the state.
+
+[Input Signal Description]:
+- `clk`: Clock signal used to synchronize the operations of the shift register.
+- `clear`: Asynchronous clear signal to reset the output to a known state.
+- `S[2:0]`: 3-bit control signal that determines the operation of the shift register (e.g., hold, shift left, shift right, parallel load).
+- `I[3:0]`: 4-bit input data used for parallel loading into the shift register.
+
+[Output Signal Description]:
+- `O[3:0]`: 4-bit output of the shift register, representing the current state of the register.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def _mux8_expr(sel, options):
+    result = options[0]
+    for idx in range(1, 8):
+        result = pyrtl.select(sel == pyrtl.Const(idx, bitwidth=3), truecase=options[idx], falsecase=result)
+    return result
+
+def TopModule(clear, S, I):
+    O = pyrtl.Register(bitwidth=4, name='O', reset_value=0)
+
+    d0 = _mux8_expr(S, [O[0], pyrtl.Const(0, bitwidth=1), O[1], I[0], ~O[0], O[3], O[1], O[2]])
+    d1 = _mux8_expr(S, [O[1], O[0], O[2], I[1], ~O[1], O[0], O[2], O[3]])
+    d2 = _mux8_expr(S, [O[2], O[1], O[3], I[2], ~O[2], O[1], O[3], O[0]])
+    d3 = _mux8_expr(S, [O[3], O[2], pyrtl.Const(0, bitwidth=1), I[3], ~O[3], O[2], O[0], O[1]])
+
+    next_state = pyrtl.concat(d3, d2, d1, d0)
+    O.next <<= pyrtl.select(clear, truecase=pyrtl.Const(0, bitwidth=4), falsecase=next_state)
+    return O
+```
+",<_io.TextIOWrapper name='./knowledge_base/Universal_shift_reg.txt' mode='r' encoding='utf-8'>,Universal_shift_reg.txt
+bcd_counter,"[Keyword]: bcd_counter
+
+[Design Category]: Sequential Logic
+
+[Design Function Description]:
+This design is a Binary Coded Decimal (BCD) counter that counts from 00 to 49. It uses a two-digit BCD format, where each digit is represented by a 4-bit binary number. The counter increments on the rising edge of a debounced switch signal and resets when the reset signal is active low.
+
+PyRTL refinement: the external debounce helper is not recreated here, so the switch input is assumed to arrive already debounced and the design increments on a detected rising edge of `sw_hi = ~sw`.
+
+[Input Signal Description]:
+- `clk`: Clock signal used to synchronize the counter operations.
+- `rst_n`: Active-low reset signal. When low, it resets the counter to 00.
+- `sw`: Active-low switch input. It is debounced and used to trigger the counting operation.
+
+[Output Signal Description]:
+- `dig1`: 4-bit output representing the tens digit of the BCD counter.
+- `dig0`: 4-bit output representing the units digit of the BCD counter.
+- `done_tick`: Signal that goes high for one clock cycle when the counter increments.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(rst_n, sw):
+    idle = pyrtl.Const(0, bitwidth=1)
+    done = pyrtl.Const(1, bitwidth=1)
+
+    state_reg = pyrtl.Register(bitwidth=1, name='state_reg', reset_value=0)
+    dig1 = pyrtl.Register(bitwidth=4, name='dig1', reset_value=0)
+    dig0 = pyrtl.Register(bitwidth=4, name='dig0', reset_value=0)
+    sw_prev = pyrtl.Register(bitwidth=1, name='sw_prev', reset_value=0)
+
+    sw_hi = ~sw
+    r_edg = sw_hi & ~sw_prev
+
+    dig0_inc = (dig0 + pyrtl.Const(1, bitwidth=4))[0:4]
+    dig1_inc = (dig1 + pyrtl.Const(1, bitwidth=4))[0:4]
+    next_dig0 = pyrtl.select(dig0 == pyrtl.Const(9, bitwidth=4), truecase=pyrtl.Const(0, bitwidth=4), falsecase=dig0_inc)
+    next_dig1 = pyrtl.select(
+        dig0 == pyrtl.Const(9, bitwidth=4),
+        truecase=pyrtl.select(dig1 == pyrtl.Const(4, bitwidth=4), truecase=pyrtl.Const(0, bitwidth=4), falsecase=dig1_inc),
+        falsecase=dig1,
+    )
+
+    state_reg.next <<= pyrtl.select(
+        ~rst_n,
+        truecase=pyrtl.Const(0, bitwidth=1),
+        falsecase=pyrtl.select(state_reg == idle, truecase=pyrtl.select(r_edg, truecase=done, falsecase=idle), falsecase=idle),
+    )
+    dig0.next <<= pyrtl.select(
+        ~rst_n,
+        truecase=pyrtl.Const(0, bitwidth=4),
+        falsecase=pyrtl.select((state_reg == idle) & r_edg, truecase=next_dig0, falsecase=dig0),
+    )
+    dig1.next <<= pyrtl.select(
+        ~rst_n,
+        truecase=pyrtl.Const(0, bitwidth=4),
+        falsecase=pyrtl.select((state_reg == idle) & r_edg, truecase=next_dig1, falsecase=dig1),
+    )
+    sw_prev.next <<= pyrtl.select(~rst_n, truecase=pyrtl.Const(0, bitwidth=1), falsecase=sw_hi)
+
+    done_tick = pyrtl.WireVector(bitwidth=1, name='done_tick')
+    done_tick <<= state_reg == done
+    return dig1, dig0, done_tick
+```
+",<_io.TextIOWrapper name='./knowledge_base/bcd_counter.txt' mode='r' encoding='utf-8'>,bcd_counter.txt
+period_counter,"[Keyword]: period_counter
+
+[Design Category]: Sequential Logic
+
+[Design Function Description]:
+The design is a period counter that measures the time period of a signal in microseconds. It uses a finite state machine (FSM) to detect the rising edge of the input signal and counts the time between consecutive rising edges. The period is output in terms of microseconds, with a maximum measurable period of 1.023 seconds.
+
+[Input Signal Description]:
+- `clk`: Clock signal used to synchronize the operations of the FSM.
+- `rst_n`: Active-low reset signal to initialize the FSM and registers.
+- `start`: Signal to initiate the period measurement process.
+- `signal`: Input signal whose period is to be measured.
+
+[Output Signal Description]:
+- `ready`: Indicates that the FSM is in the idle state and ready to start a new measurement.
+- `done_tick`: Indicates that the period measurement is complete.
+- `period[19:0]`: 20-bit output representing the measured period in microseconds.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(rst_n, start, signal):
+    idle = pyrtl.Const(0, bitwidth=2)
+    waiting = pyrtl.Const(1, bitwidth=2)
+    op = pyrtl.Const(2, bitwidth=2)
+    done = pyrtl.Const(3, bitwidth=2)
+    n_minus_1 = pyrtl.Const(49, bitwidth=6)
+
+    state_reg = pyrtl.Register(bitwidth=2, name='state_reg', reset_value=0)
+    period_reg = pyrtl.Register(bitwidth=20, name='period_reg', reset_value=0)
+    tick_reg = pyrtl.Register(bitwidth=6, name='tick_reg', reset_value=0)
+    signal_reg = pyrtl.Register(bitwidth=1, name='signal_reg', reset_value=0)
+
+    edg = signal & ~signal_reg
+    next_state = state_reg
+    next_state = pyrtl.select(state_reg == idle, truecase=pyrtl.select(start, truecase=waiting, falsecase=idle), falsecase=next_state)
+    next_state = pyrtl.select(state_reg == waiting, truecase=pyrtl.select(edg, truecase=op, falsecase=waiting), falsecase=next_state)
+    next_state = pyrtl.select(state_reg == op, truecase=pyrtl.select(edg, truecase=done, falsecase=op), falsecase=next_state)
+    next_state = pyrtl.select(state_reg == done, truecase=idle, falsecase=next_state)
+
+    tick_plus = (tick_reg + pyrtl.Const(1, bitwidth=6))[0:6]
+    period_plus = (period_reg + pyrtl.Const(1, bitwidth=20))[0:20]
+
+    next_tick = tick_reg
+    next_tick = pyrtl.select((state_reg == idle) & start, truecase=pyrtl.Const(0, bitwidth=6), falsecase=next_tick)
+    next_tick = pyrtl.select(
+        (state_reg == op) & ~edg,
+        truecase=pyrtl.select(tick_reg == n_minus_1, truecase=pyrtl.Const(0, bitwidth=6), falsecase=tick_plus),
+        falsecase=next_tick,
+    )
+
+    next_period = period_reg
+    next_period = pyrtl.select((state_reg == idle) & start, truecase=pyrtl.Const(0, bitwidth=20), falsecase=next_period)
+    next_period = pyrtl.select(
+        (state_reg == op) & ~edg & (tick_reg == n_minus_1),
+        truecase=period_plus,
+        falsecase=next_period,
+    )
+
+    state_reg.next <<= pyrtl.select(~rst_n, truecase=idle, falsecase=next_state)
+    tick_reg.next <<= pyrtl.select(~rst_n, truecase=pyrtl.Const(0, bitwidth=6), falsecase=next_tick)
+    period_reg.next <<= pyrtl.select(~rst_n, truecase=pyrtl.Const(0, bitwidth=20), falsecase=next_period)
+    signal_reg.next <<= pyrtl.select(~rst_n, truecase=pyrtl.Const(0, bitwidth=1), falsecase=signal)
+
+    ready = pyrtl.WireVector(bitwidth=1, name='ready')
+    done_tick = pyrtl.WireVector(bitwidth=1, name='done_tick')
+    period = pyrtl.WireVector(bitwidth=20, name='period')
+    ready <<= state_reg == idle
+    done_tick <<= state_reg == done
+    period <<= period_reg
+    return ready, done_tick, period
+```
+",<_io.TextIOWrapper name='./knowledge_base/period_counter.txt' mode='r' encoding='utf-8'>,period_counter.txt
+Rotate_16,"[Keyword]: Rotate_16
+
+[Design Category]: Combinational Logic
+
+[Design Function Description]:
+The design implements a 16-bit barrel shifter that can perform both left and right rotations. The direction of the shift is determined by the control signal `LR`. If `LR` is high, the circuit performs a left rotation; otherwise, it performs a right rotation. The amount of rotation is specified by a 4-bit input `amt`, allowing for rotations from 0 to 15 positions.
+
+[Input Signal Description]:
+- `num[15:0]`: A 16-bit input signal representing the number to be rotated.
+- `amt[3:0]`: A 4-bit input signal specifying the number of positions to rotate the input number.
+- `LR`: A control signal that determines the direction of rotation. If `LR` is high, a left rotation is performed; if low, a right rotation is performed.
+
+[Output Signal Description]:
+- `real_out[15:0]`: A 16-bit output signal that represents the result of the rotation operation on the input number `num`, based on the specified direction and amount.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(num, amt, LR):
+    right1 = pyrtl.select(amt[0], truecase=pyrtl.concat(num[0:1], num[1:16]), falsecase=num)
+    right2 = pyrtl.select(amt[1], truecase=pyrtl.concat(right1[0:2], right1[2:16]), falsecase=right1)
+    right4 = pyrtl.select(amt[2], truecase=pyrtl.concat(right2[0:4], right2[4:16]), falsecase=right2)
+    right8 = pyrtl.select(amt[3], truecase=pyrtl.concat(right4[0:8], right4[8:16]), falsecase=right4)
+
+    left1 = pyrtl.select(amt[0], truecase=pyrtl.concat(num[0:15], num[15:16]), falsecase=num)
+    left2 = pyrtl.select(amt[1], truecase=pyrtl.concat(left1[0:14], left1[14:16]), falsecase=left1)
+    left4 = pyrtl.select(amt[2], truecase=pyrtl.concat(left2[0:12], left2[12:16]), falsecase=left2)
+    left8 = pyrtl.select(amt[3], truecase=pyrtl.concat(left4[0:8], left4[8:16]), falsecase=left4)
+
+    real_out = pyrtl.WireVector(bitwidth=16, name='real_out')
+    real_out <<= pyrtl.select(LR, truecase=left8, falsecase=right8)
+    return real_out
+```
+",<_io.TextIOWrapper name='./knowledge_base/Rotate_16.txt' mode='r' encoding='utf-8'>,Rotate_16.txt
+Dff8,"[Keyword]: Dff8
+
+[Design Category]: Sequential Logic
+
+[Design Function Description]:
+This design is an 8-bit register that captures and holds the input data on the rising edge of the clock signal. It is a basic storage element used in sequential circuits.
+
+[Input Signal Description]:
+clk: Clock signal used to synchronize data capture.
+d[7:0]: 8-bit data input signal that is captured and stored on the rising edge of the clock.
+
+[Output Signal Description]:
+q[7:0]: 8-bit output signal that holds the value of the input data after being captured on the rising edge of the clock.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(d):
+    q = pyrtl.Register(bitwidth=8, name='q', reset_value=0)
+    q.next <<= d
+    return q
+```
+",<_io.TextIOWrapper name='./knowledge_base/Dff8.txt' mode='r' encoding='utf-8'>,Dff8.txt
+dual_edge_detector_simpler,"[Keyword]: dual_edge_detector_simpler
+
+[Design Category]: Sequential Logic
+
+[Design Function Description]:
+The design is a dual-edge detector circuit. It detects changes in the input signal `level` on both the rising and falling edges of the clock signal `clk`. The output `edg` indicates when a change in the `level` input has occurred.
+
+[Input Signal Description]:
+- `clk`: Clock signal used to synchronize the edge detection process.
+- `rst_n`: Active-low reset signal. When asserted (low), it resets the internal state of the circuit.
+- `level`: Input signal whose edges (transitions) are to be detected.
+
+[Output Signal Description]:
+- `edg`: Output signal that indicates a detected edge (transition) in the `level` input. It is high when a change in the `level` input is detected.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(rst_n, level):
+    level_reg = pyrtl.Register(bitwidth=1, name='level_reg', reset_value=0)
+    level_reg.next <<= pyrtl.select(~rst_n, truecase=pyrtl.Const(0, bitwidth=1), falsecase=level)
+
+    edg = pyrtl.WireVector(bitwidth=1, name='edg')
+    edg <<= pyrtl.select(~rst_n, truecase=pyrtl.Const(0, bitwidth=1), falsecase=level ^ level_reg)
+    return edg
+```
+",<_io.TextIOWrapper name='./knowledge_base/dual_edge_detector_simpler.txt' mode='r' encoding='utf-8'>,dual_edge_detector_simpler.txt
+bcd_adder,"[Keyword]: bcd_adder
+
+[Design Category]: Arithmetic Circuits
+
+[Design Function Description]:
+The design is a Binary Coded Decimal (BCD) adder. It takes two 4-bit BCD numbers and an optional carry-in bit as inputs, and produces a 4-bit BCD sum and a carry-out bit. If the sum of the inputs exceeds 9, it adjusts the result by adding 6 to ensure the output remains a valid BCD number.
+
+[Input Signal Description]:
+- a[3:0]: A 4-bit input representing the first BCD number.
+- b[3:0]: A 4-bit input representing the second BCD number.
+- cin: A 1-bit input representing the carry-in from a previous addition.
+
+[Output Signal Description]:
+- sum[3:0]: A 4-bit output representing the BCD sum of the inputs.
+- cout: A 1-bit output representing the carry-out, indicating if the sum exceeded the BCD range.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(a, b, cin):
+    temp = (
+        pyrtl.concat(pyrtl.Const(0, bitwidth=1), a)
+        + pyrtl.concat(pyrtl.Const(0, bitwidth=1), b)
+        + pyrtl.concat(pyrtl.Const(0, bitwidth=4), cin)
+    )
+    needs_correction = temp > pyrtl.Const(9, bitwidth=5)
+    corrected = (temp + pyrtl.Const(6, bitwidth=5))[0:5]
+
+    sum_ = pyrtl.WireVector(bitwidth=4, name='sum')
+    cout = pyrtl.WireVector(bitwidth=1, name='cout')
+    sum_ <<= pyrtl.select(needs_correction, truecase=corrected[0:4], falsecase=temp[0:4])
+    cout <<= pyrtl.select(
+        needs_correction,
+        truecase=pyrtl.Const(1, bitwidth=1),
+        falsecase=pyrtl.Const(0, bitwidth=1),
+    )
+    return sum_, cout
+```
+",<_io.TextIOWrapper name='./knowledge_base/bcd_adder.txt' mode='r' encoding='utf-8'>,bcd_adder.txt
+dual_prioenc,"[Keyword]: dual_prioenc
+
+[Design Category]: Combinational Logic
+
+[Design Function Description]:
+The design is a dual priority encoder. It scans a 12-bit input vector to identify the positions of the first and second highest priority '1' bits. The position of the first '1' bit found is stored in the `first` output, and the position of the second '1' bit is stored in the `second` output.
+
+[Input Signal Description]:
+`in[11:0]`: A 12-bit input signal where each bit can be either '0' or '1'. The circuit will prioritize the bits from the most significant to the least significant to determine the positions of the first and second '1' bits.
+
+[Output Signal Description]:
+`first[3:0]`: A 4-bit output signal representing the position (1-based index) of the first '1' bit found in the input.
+`second[3:0]`: A 4-bit output signal representing the position (1-based index) of the second '1' bit found in the input.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(in_):  # in_ corresponds to the original Verilog signal named ""in""
+    first_expr = pyrtl.Const(0, bitwidth=4)
+    second_expr = pyrtl.Const(0, bitwidth=4)
+    found_first = pyrtl.Const(0, bitwidth=1)
+    found_second = pyrtl.Const(0, bitwidth=1)
+
+    for idx in range(11, -1, -1):
+        bit = in_[idx]
+        pos = pyrtl.Const(idx + 1, bitwidth=4)
+        assign_first = bit & ~found_first
+        assign_second = bit & found_first & ~found_second
+        first_expr = pyrtl.select(assign_first, truecase=pos, falsecase=first_expr)
+        second_expr = pyrtl.select(assign_second, truecase=pos, falsecase=second_expr)
+        found_first = found_first | bit
+        found_second = found_second | assign_second
+
+    first = pyrtl.WireVector(bitwidth=4, name='first')
+    second = pyrtl.WireVector(bitwidth=4, name='second')
+    first <<= first_expr
+    second <<= second_expr
+    return first, second
+```
+",<_io.TextIOWrapper name='./knowledge_base/dual_prioenc.txt' mode='r' encoding='utf-8'>,dual_prioenc.txt
+Lfsr5,"[Keyword]: Lfsr5
+
+[Design Category]: Sequential Logic
+
+[Design Function Description]:
+This design implements a 5-bit Linear Feedback Shift Register (LFSR) with a specific feedback polynomial. The LFSR generates a pseudo-random sequence of bits. The register is reset to a specific value (5'h1) when the reset signal is active.
+
+[Input Signal Description]:
+clk: Clock signal that triggers the LFSR to shift and update its state on the rising edge.
+reset: Active-high synchronous reset signal that initializes the LFSR to the value 5'h1.
+
+[Output Signal Description]:
+q[4:0]: 5-bit output representing the current state of the LFSR, which changes with each clock cycle based on the feedback logic.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(reset):
+    q = pyrtl.Register(bitwidth=5, name='q', reset_value=1)
+    next_q = pyrtl.concat(q[0], q[4], q[3] ^ q[0], q[2], q[1])
+    q.next <<= pyrtl.select(reset, truecase=pyrtl.Const(1, bitwidth=5), falsecase=next_q)
+    return q
+```
+",<_io.TextIOWrapper name='./knowledge_base/Lfsr5.txt' mode='r' encoding='utf-8'>,Lfsr5.txt
+Vectorgates,"[Keyword]: Vectorgates
+
+[Design Category]: Combinational Logic
+
+[Design Function Description]:
+This design performs bitwise OR, logical OR, and bitwise NOT operations on two 3-bit input vectors. It outputs the results of these operations.
+
+[Input Signal Description]:
+a[2:0]: A 3-bit input vector.
+b[2:0]: Another 3-bit input vector.
+
+[Output Signal Description]:
+out_or_bitwise[2:0]: The result of the bitwise OR operation between inputs a and b.
+out_or_logical: The result of the logical OR operation between inputs a and b, which checks if either a or b is non-zero.
+out_not[5:0]: A 6-bit output where the upper 3 bits are the bitwise NOT of b and the lower 3 bits are the bitwise NOT of a.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(a, b):
+    zero3 = pyrtl.Const(0, bitwidth=3)
+    out_or_bitwise = pyrtl.WireVector(bitwidth=3, name='out_or_bitwise')
+    out_or_logical = pyrtl.WireVector(bitwidth=1, name='out_or_logical')
+    out_not = pyrtl.WireVector(bitwidth=6, name='out_not')
+
+    out_or_bitwise <<= a | b
+    out_or_logical <<= (a != zero3) | (b != zero3)
+    out_not <<= pyrtl.concat(~b, ~a)
+    return out_or_bitwise, out_or_logical, out_not
+```
+",<_io.TextIOWrapper name='./knowledge_base/Vectorgates.txt' mode='r' encoding='utf-8'>,Vectorgates.txt
+carry_look_ahead_adder,"[Keyword]: carry_look_ahead_adder
+
+[Design Category]: Arithmetic Circuits
+
+[Design Function Description]:
+The design implements a 16-bit carry look-ahead adder. This adder is used to perform fast binary addition of two 16-bit numbers along with an input carry. It uses a hierarchical structure of 4-bit carry look-ahead adders to achieve faster computation by reducing the carry propagation delay.
+
+[Input Signal Description]:
+- a[15:0]: A 16-bit input operand for the addition.
+- b[15:0]: Another 16-bit input operand for the addition.
+- cin: A single-bit input representing the carry-in for the least significant bit addition.
+
+[Output Signal Description]:
+- sum[15:0]: A 16-bit output representing the sum of the input operands a and b, including the carry-in.
+- cout: A single-bit output representing the carry-out from the most significant bit addition.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(a, b, cin):
+    total = (
+        pyrtl.concat(pyrtl.Const(0, bitwidth=1), a)
+        + pyrtl.concat(pyrtl.Const(0, bitwidth=1), b)
+        + pyrtl.concat(pyrtl.Const(0, bitwidth=16), cin)
+    )
+    sum_ = pyrtl.WireVector(bitwidth=16, name='sum')
+    cout = pyrtl.WireVector(bitwidth=1, name='cout')
+    sum_ <<= total[0:16]
+    cout <<= total[16]
+    return sum_, cout
+```
+",<_io.TextIOWrapper name='./knowledge_base/carry_look_ahead_adder.txt' mode='r' encoding='utf-8'>,carry_look_ahead_adder.txt
+Dff8r,"[Keyword]: Dff8r
+
+[Design Category]: Sequential Logic
+
+[Design Function Description]:
+This design is an 8-bit synchronous register with a synchronous reset. It captures the input data `d` on the rising edge of the clock `clk` and outputs it as `q`. If the `reset` signal is high during a clock edge, the output `q` is reset to 0.
+
+[Input Signal Description]:
+- `clk`: Clock signal used to synchronize the data capture.
+- `reset`: Synchronous reset signal. When high, it resets the output `q` to 0 on the next rising edge of `clk`.
+- `d[7:0]`: 8-bit data input that is captured and stored in the register on the rising edge of `clk` when `reset` is low.
+
+[Output Signal Description]:
+- `q[7:0]`: 8-bit output that holds the value of the input `d` after being captured on the rising edge of `clk`. It is reset to 0 when `reset` is high.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(reset, d):
+    q = pyrtl.Register(bitwidth=8, name='q', reset_value=0)
+    q.next <<= pyrtl.select(reset, truecase=pyrtl.Const(0, bitwidth=8), falsecase=d)
+    return q
+```
+",<_io.TextIOWrapper name='./knowledge_base/Dff8r.txt' mode='r' encoding='utf-8'>,Dff8r.txt
+alt_bcd_counter,"[Keyword]: alt_bcd_counter
+
+[Design Category]: Sequential Logic
+
+[Design Function Description]:
+This design is a Binary Coded Decimal (BCD) counter that counts in decimal digits. It uses three 4-bit registers to represent the decimal digits, allowing it to count from 000 to 999. The counter increments every time the `go` signal is high and the internal counter reaches 4,999,999, effectively creating a time delay based on the clock frequency.
+
+[Input Signal Description]:
+- `clk`: Clock signal that drives the counter.
+- `rst_n`: Active-low reset signal that initializes the counter to zero.
+- `go`: Control signal that enables the counting process when high.
+
+[Output Signal Description]:
+- `s1`: 4-bit register representing the hundreds digit of the BCD counter.
+- `s0`: 4-bit register representing the tens digit of the BCD counter.
+- `ms0`: 4-bit register representing the units digit of the BCD counter.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(rst_n, go):
+    s1 = pyrtl.Register(bitwidth=4, name='s1', reset_value=0)
+    s0 = pyrtl.Register(bitwidth=4, name='s0', reset_value=0)
+    ms0 = pyrtl.Register(bitwidth=4, name='ms0', reset_value=0)
+    counter_reg = pyrtl.Register(bitwidth=23, name='counter_reg', reset_value=0)
+
+    terminal = counter_reg == pyrtl.Const(4_999_999, bitwidth=23)
+    counter_plus = (counter_reg + pyrtl.Const(1, bitwidth=23))[0:23]
+    ms0_plus = (ms0 + pyrtl.Const(1, bitwidth=4))[0:4]
+    s0_plus = (s0 + pyrtl.Const(1, bitwidth=4))[0:4]
+    s1_plus = (s1 + pyrtl.Const(1, bitwidth=4))[0:4]
+
+    ms0_wrap = pyrtl.select(ms0 == pyrtl.Const(9, bitwidth=4), truecase=pyrtl.Const(0, bitwidth=4), falsecase=ms0_plus)
+    s0_wrap = pyrtl.select(s0 == pyrtl.Const(9, bitwidth=4), truecase=pyrtl.Const(0, bitwidth=4), falsecase=s0_plus)
+    s1_wrap = pyrtl.select(s1 == pyrtl.Const(9, bitwidth=4), truecase=pyrtl.Const(0, bitwidth=4), falsecase=s1_plus)
+
+    counter_reg.next <<= pyrtl.select(
+        ~rst_n,
+        truecase=pyrtl.Const(0, bitwidth=23),
+        falsecase=pyrtl.select(go, truecase=pyrtl.select(terminal, truecase=pyrtl.Const(0, bitwidth=23), falsecase=counter_plus), falsecase=counter_reg),
+    )
+    ms0.next <<= pyrtl.select(
+        ~rst_n,
+        truecase=pyrtl.Const(0, bitwidth=4),
+        falsecase=pyrtl.select(go & terminal, truecase=ms0_wrap, falsecase=ms0),
+    )
+    s0.next <<= pyrtl.select(
+        ~rst_n,
+        truecase=pyrtl.Const(0, bitwidth=4),
+        falsecase=pyrtl.select(go & terminal & (ms0 == pyrtl.Const(9, bitwidth=4)), truecase=s0_wrap, falsecase=s0),
+    )
+    s1.next <<= pyrtl.select(
+        ~rst_n,
+        truecase=pyrtl.Const(0, bitwidth=4),
+        falsecase=pyrtl.select(
+            go & terminal & (ms0 == pyrtl.Const(9, bitwidth=4)) & (s0 == pyrtl.Const(9, bitwidth=4)),
+            truecase=s1_wrap,
+            falsecase=s1,
+        ),
+    )
+    return s1, s0, ms0
+```
+",<_io.TextIOWrapper name='./knowledge_base/alt_bcd_counter.txt' mode='r' encoding='utf-8'>,alt_bcd_counter.txt
+barrel_shifter_8bit,"[Keyword]: barrel_shifter_8bit
+
+[Design Category]: Combinational Logic
+
+[Design Function Description]:
+The design is an 8-bit barrel shifter that performs right shifts on an 8-bit input vector. The amount of shift is controlled by a 3-bit control signal, allowing for shifts from 0 to 7 positions to the right.
+
+[Input Signal Description]:
+- `in[7:0]`: 8-bit input signal that represents the data to be shifted.
+- `ctrl[2:0]`: 3-bit control signal that determines the number of positions the input data is shifted to the right. Each bit in `ctrl` corresponds to a different level of shifting (4-bit, 2-bit, and 1-bit shifts).
+
+[Output Signal Description]:
+- `out[7:0]`: 8-bit output signal that represents the shifted result of the input data based on the control signal.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(in_, ctrl):  # in_ corresponds to the original Verilog signal named ""in""
+    stage4 = pyrtl.select(
+        ctrl[2],
+        truecase=pyrtl.concat(pyrtl.Const(0, bitwidth=4), in_[4:8]),
+        falsecase=in_,
+    )
+    stage2 = pyrtl.select(
+        ctrl[1],
+        truecase=pyrtl.concat(pyrtl.Const(0, bitwidth=2), stage4[2:8]),
+        falsecase=stage4,
+    )
+    stage1 = pyrtl.select(
+        ctrl[0],
+        truecase=pyrtl.concat(pyrtl.Const(0, bitwidth=1), stage2[1:8]),
+        falsecase=stage2,
+    )
+
+    out = pyrtl.WireVector(bitwidth=8, name='out')
+    out <<= stage1
+    return out
+```
+",<_io.TextIOWrapper name='./knowledge_base/barrel_shifter_8bit.txt' mode='r' encoding='utf-8'>,barrel_shifter_8bit.txt
+Dff16e,"[Keyword]: Dff16e
+
+[Design Category]: Sequential Logic
+
+[Design Function Description]:
+This design is a byte-enable register with asynchronous reset. It stores a 16-bit input data `d` into the output `q` based on the byte-enable signal `byteena`. The register updates its stored value on the rising edge of the clock `clk`, and it can reset to zero asynchronously when `resetn` is low.
+
+[Input Signal Description]:
+- `clk`: Clock signal used to synchronize the data storage.
+- `resetn`: Active-low asynchronous reset signal. When low, it resets the output `q` to zero.
+- `byteena[1:0]`: 2-bit byte-enable signal. `byteena[1]` controls the update of the upper byte (bits 15 to 8) of `q`, and `byteena[0]` controls the update of the lower byte (bits 7 to 0) of `q`.
+- `d[15:0]`: 16-bit input data to be stored in the register.
+
+[Output Signal Description]:
+- `q[15:0]`: 16-bit output that holds the stored data. It updates based on the `byteena` signal and the input `d` on the rising edge of `clk`, or resets to zero when `resetn` is low.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(resetn, byteena, d):
+    q = pyrtl.Register(bitwidth=16, name='q', reset_value=0)
+    upper_next = pyrtl.select(byteena[1], truecase=d[8:16], falsecase=q[8:16])
+    lower_next = pyrtl.select(byteena[0], truecase=d[0:8], falsecase=q[0:8])
+    merged_next = pyrtl.concat(upper_next, lower_next)
+    q.next <<= pyrtl.select(~resetn, truecase=pyrtl.Const(0, bitwidth=16), falsecase=merged_next)
+    return q
+```
+",<_io.TextIOWrapper name='./knowledge_base/Dff16e.txt' mode='r' encoding='utf-8'>,Dff16e.txt
+binary_decoder_4x16,"[Keyword]: binary_decoder_4x16
+
+[Design Category]: Combinational Logic
+
+[Design Function Description]:
+The design is a 4-to-16 binary decoder. It takes a 4-bit input and decodes it into a 16-bit output, where only one of the 16 output bits is set to '1' based on the binary value of the input, and the rest are set to '0'.
+
+[Input Signal Description]:
+a[3:0]: A 4-bit input signal that represents a binary number. This input is used to determine which one of the 16 output lines will be activated.
+
+[Output Signal Description]:
+bcode[15:0]: A 16-bit output signal where only one bit is set to '1' corresponding to the binary value of the input 'a', and all other bits are '0'.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(a):
+    terms = [a == pyrtl.Const(idx, bitwidth=4) for idx in range(16)]
+    bcode = pyrtl.WireVector(bitwidth=16, name='bcode')
+    bcode <<= pyrtl.concat(*reversed(terms))
+    return bcode
+```
+",<_io.TextIOWrapper name='./knowledge_base/binary_decoder_4x16.txt' mode='r' encoding='utf-8'>,binary_decoder_4x16.txt
+binary_decoder_2x4,"[Keyword]: binary_decoder_2x4
+
+[Design Category]: Combinational Logic
+
+[Design Function Description]:
+The circuit is a 2-to-4 binary decoder. It takes a 2-bit binary input and decodes it into a 4-bit output, where only one of the output bits is set to '1' based on the input combination, provided the enable signal is active.
+
+[Input Signal Description]:
+- `en`: Enable signal. The decoder is active and produces an output only when this signal is high.
+- `a[1:0]`: 2-bit input signal that determines which one of the 4 output lines will be activated.
+
+[Output Signal Description]:
+- `bcode[3:0]`: 4-bit output signal where only one bit is set to '1' based on the input `a` when the enable signal `en` is high. Each bit corresponds to one of the possible combinations of the input `a`.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(en, a):
+    terms = [en & (a == pyrtl.Const(idx, bitwidth=2)) for idx in range(4)]
+    bcode = pyrtl.WireVector(bitwidth=4, name='bcode')
+    bcode <<= pyrtl.concat(terms[3], terms[2], terms[1], terms[0])
+    return bcode
+```
+",<_io.TextIOWrapper name='./knowledge_base/binary_decoder_2x4.txt' mode='r' encoding='utf-8'>,binary_decoder_2x4.txt
+WaveRenderer Demo,"[Keyword]: WaveRenderer Demo
+
+[Design Category]: Simulation / Trace Visualization
+
+[Design Function Description]:
+Demonstrates creating clock dividers and counters in PyRTL, simulating them,
+and rendering the resulting waveforms with different terminal-friendly rendering options.
+
+[Input Signal Description]:
+None (all signals generated internally)
+
+[Output Signal Description]:
+Waveform traces rendered in the terminal with various styles
+
+import pyrtl
+
+# ----------------------------
+# Functions to create hardware
+# ----------------------------
+def make_clock(period: int) -> pyrtl.Register:
+    """"""Create a clock signal that inverts every `period` cycles using a chain of registers.""""""
+    assert period > 0
+    first_reg = pyrtl.Register(bitwidth=1, name=f""clock_0_{period}"", reset_value=1)
+    last_reg = first_reg
+    for offset in range(1, period):
+        reg = pyrtl.Register(bitwidth=1, name=f""clock_{offset}_{period}"")
+        reg.next <<= last_reg
+        last_reg = reg
+    first_reg.next <<= ~last_reg
+    return last_reg
+
+def make_counter(period: int, bitwidth: int = 2) -> pyrtl.Register:
+    """"""Create a counter that increments every `period` cycles using a chain of registers.""""""
+    assert period > 0
+    first_reg = pyrtl.Register(bitwidth=bitwidth, name=f""counter_0_{period}"")
+    last_reg = first_reg
+    for offset in range(1, period):
+        reg = pyrtl.Register(bitwidth=bitwidth, name=f""counter_{offset}_{period}"")
+        reg.next <<= last_reg
+        last_reg = reg
+    first_reg.next <<= last_reg + pyrtl.Const(1)
+    return last_reg
+
+# ----------------------------
+# Create hardware signals
+# ----------------------------
+make_clock(period=1)
+make_clock(period=2)
+make_counter(period=1)
+make_counter(period=2)
+
+# ----------------------------
+# Simulation
+# ----------------------------
+sim = pyrtl.Simulation()
+sim.step_multiple(nsteps=20)
+
+# ----------------------------
+# Render traces with various renderer options
+# ----------------------------
+renderers = {
+    ""powerline"": (
+        pyrtl.simulation.PowerlineRendererConstants(),
+        ""Requires a font with powerline glyphs"",
+    ),
+    ""utf-8"": (
+        pyrtl.simulation.Utf8RendererConstants(),
+        ""Unicode, default non-Windows renderer"",
+    ),
+    ""utf-8-alt"": (
+        pyrtl.simulation.Utf8AltRendererConstants(),
+        ""Unicode, alternate display option"",
+    ),
+    ""cp437"": (
+        pyrtl.simulation.Cp437RendererConstants(),
+        ""Code page 437 (8-bit ASCII), default Windows renderer"",
+    ),
+    ""ascii"": (
+        pyrtl.simulation.AsciiRendererConstants(),
+        ""Basic 7-bit ASCII renderer"",
+    ),
+}
+
+for name, (constants, notes) in renderers.items():
+    print(f""# {notes}"")
+    print(f""export PYRTL_RENDERER={name}\n"")
+    sim.tracer.render_trace(
+        renderer=pyrtl.simulation.WaveRenderer(constants),
+        repr_func=int
+    )
+    print()",<_io.TextIOWrapper name='./knowledge_base/exWaveRenderer.txt' mode='r' encoding='utf-8'>,exWaveRenderer.txt
+Mux_8_to_1,"[Keyword]: Mux_8_to_1
+
+[Design Category]: Combinational Logic
+
+[Design Function Description]:
+This design implements an 8-to-1 multiplexer. It selects one of the eight input signals (in0 to in7) based on a 3-bit selection signal (S) and outputs the selected input through Mux_Out.
+
+[Input Signal Description]:
+- S[2:0]: A 3-bit selection signal that determines which one of the eight inputs (in0 to in7) is routed to the output.  
+- in0, in1, in2, in3, in4, in5, in6, in7: These are the eight input signals to the multiplexer. Each input is a single bit.
+
+[Output Signal Description]:
+- Mux_Out: The output signal of the multiplexer, which is the selected input based on the value of the selection signal S.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(S, in0, in1, in2, in3, in4, in5, in6, in7):
+    selected = in0
+    selected = pyrtl.select(S == pyrtl.Const(1, bitwidth=3), truecase=in1, falsecase=selected)
+    selected = pyrtl.select(S == pyrtl.Const(2, bitwidth=3), truecase=in2, falsecase=selected)
+    selected = pyrtl.select(S == pyrtl.Const(3, bitwidth=3), truecase=in3, falsecase=selected)
+    selected = pyrtl.select(S == pyrtl.Const(4, bitwidth=3), truecase=in4, falsecase=selected)
+    selected = pyrtl.select(S == pyrtl.Const(5, bitwidth=3), truecase=in5, falsecase=selected)
+    selected = pyrtl.select(S == pyrtl.Const(6, bitwidth=3), truecase=in6, falsecase=selected)
+    selected = pyrtl.select(S == pyrtl.Const(7, bitwidth=3), truecase=in7, falsecase=selected)
+
+    Mux_Out = pyrtl.WireVector(bitwidth=1, name='Mux_Out')
+    Mux_Out <<= selected
+    return Mux_Out
+```
+",<_io.TextIOWrapper name='./knowledge_base/Mux_8_to_1.txt' mode='r' encoding='utf-8'>,Mux_8_to_1.txt
+adder32,"[Keyword]: adder32
+
+[Design Category]: Arithmetic Circuits
+
+[Design Function Description]:
+This design implements a 32-bit binary adder with carry-in and carry-out functionality. It takes two 32-bit binary numbers and an additional carry-in bit as inputs, and produces a 32-bit sum and a carry-out bit as outputs.
+
+[Input Signal Description]:
+- A[31:0]: A 32-bit input operand for the addition.
+- B[31:0]: Another 32-bit input operand for the addition.
+- Ci: A single-bit carry-in input that is added to the sum of A and B.
+
+[Output Signal Description]:
+- S[31:0]: A 32-bit output representing the sum of the inputs A, B, and the carry-in Ci.
+- Co: A single-bit carry-out output that indicates an overflow from the most significant bit of the sum.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(A, B, Ci):
+    total = (
+        pyrtl.concat(pyrtl.Const(0, bitwidth=1), A)
+        + pyrtl.concat(pyrtl.Const(0, bitwidth=1), B)
+        + pyrtl.concat(pyrtl.Const(0, bitwidth=32), Ci)
+    )
+    S = pyrtl.WireVector(bitwidth=32, name='S')
+    Co = pyrtl.WireVector(bitwidth=1, name='Co')
+    S <<= total[0:32]
+    Co <<= total[32]
+    return S, Co
+```
+",<_io.TextIOWrapper name='./knowledge_base/adder32.txt' mode='r' encoding='utf-8'>,adder32.txt
+muxdff,"[Keyword]: muxdff
+
+[Design Category]: Sequential Logic
+
+[Design Function Description]:
+This design is a simple D-type flip-flop with a load-enable feature. It captures the input data based on the clock edge and the load signal. If the load signal (L) is high, the flip-flop captures the data from the `rin` input; otherwise, it captures the data from the `qin` input.
+
+[Input Signal Description]:
+- `clk`: Clock signal that triggers the data capture on its rising edge.
+- `L`: Load-enable signal that determines which input data to capture.
+- `rin`: Data input that is captured when the load-enable signal (L) is high.
+- `qin`: Data input that is captured when the load-enable signal (L) is low.
+
+[Output Signal Description]:
+- `Q`: The output of the flip-flop, which holds the captured data based on the clock and load-enable conditions.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(L, rin, qin):
+    Q = pyrtl.Register(bitwidth=1, name='Q', reset_value=0)
+    Q.next <<= pyrtl.select(L, truecase=rin, falsecase=qin)
+    return Q
+```
+",<_io.TextIOWrapper name='./knowledge_base/muxdff.txt' mode='r' encoding='utf-8'>,muxdff.txt
+greater_than_4bit,"[Keyword]: greater_than_4bit
+
+[Design Category]: Combinational Logic
+
+[Design Function Description]:
+The circuit is designed to compare two 4-bit binary numbers and determine if the first number (a) is greater than the second number (b). It uses a hierarchical approach by dividing the 4-bit numbers into two 2-bit segments and comparing them separately.
+
+[Input Signal Description]:
+- a[3:0]: A 4-bit input signal representing the first number to be compared.
+- b[3:0]: A 4-bit input signal representing the second number to be compared.
+
+[Output Signal Description]:
+- gt: A 1-bit output signal that is true (1) if the first number (a) is greater than the second number (b), otherwise false (0).
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(a, b):
+    gt = pyrtl.WireVector(bitwidth=1, name='gt')
+    gt <<= a > b
+    return gt
+```
+",<_io.TextIOWrapper name='./knowledge_base/greater_than_4bit.txt' mode='r' encoding='utf-8'>,greater_than_4bit.txt
+Mux2to1,"[Keyword]: Mux2to1
+
+[Design Category]: Combinational Logic
+
+[Design Function Description]:
+This design implements a 2-to-1 multiplexer. It selects one of the two input signals, `a` or `b`, based on the value of the selection signal `sel`.
+
+[Input Signal Description]:
+- `a`: One of the input signals to the multiplexer.
+- `b`: The other input signal to the multiplexer.
+- `sel`: A selection signal that determines which input signal is passed to the output. If `sel` is 1, `b` is selected; if `sel` is 0, `a` is selected.
+
+[Output Signal Description]:
+- `out`: The output signal of the multiplexer, which is either `a` or `b` depending on the value of `sel`.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(a, b, sel):
+    out = pyrtl.WireVector(bitwidth=1, name='out')
+    out <<= pyrtl.select(sel, truecase=b, falsecase=a)
+    return out
+```
+",<_io.TextIOWrapper name='./knowledge_base/Mux2to1.txt' mode='r' encoding='utf-8'>,Mux2to1.txt
+Popcount3,"[Keyword]: Popcount3
+
+[Design Category]: Combinational Logic
+
+[Design Function Description]:
+The circuit counts the number of '1's in a 3-bit input vector and outputs the count as a 2-bit binary number.
+
+[Input Signal Description]:
+in[2:0]: A 3-bit input signal representing a binary number, where each bit can be either 0 or 1.
+
+[Output Signal Description]:
+out[1:0]: A 2-bit output signal representing the count of '1's present in the input signal 'in'.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(in_):  # in_ corresponds to the original Verilog signal named ""in""
+    count = pyrtl.Const(0, bitwidth=2)
+    for idx in range(3):
+        addend = pyrtl.concat(pyrtl.Const(0, bitwidth=1), in_[idx])
+        count = (count + addend)[0:2]
+
+    out = pyrtl.WireVector(bitwidth=2, name='out')
+    out <<= count
+    return out
+```
+",<_io.TextIOWrapper name='./knowledge_base/Popcount3.txt' mode='r' encoding='utf-8'>,Popcount3.txt
+lfsr,"[Keyword]: lfsr
+
+[Design Category]: Sequential Logic
+
+[Design Function Description]:
+This design implements a 4-bit Linear Feedback Shift Register (LFSR). An LFSR is a shift register whose input bit is a linear function of its previous state. In this case, the feedback is generated by XORing the two most significant bits of the register, and the result is inverted before being fed back into the least significant bit.
+
+[Input Signal Description]:
+- clk: Clock signal that triggers the shift operation on the rising edge.
+- rst: Asynchronous reset signal that initializes the LFSR output to 0 when high.
+
+[Output Signal Description]:
+- out[3:0]: 4-bit output representing the current state of the LFSR.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(rst):
+    out = pyrtl.Register(bitwidth=4, name='out', reset_value=0)
+    feedback = ~(out[3] ^ out[2])
+    shifted = pyrtl.concat(out[0:3], feedback)
+    out.next <<= pyrtl.select(rst, truecase=pyrtl.Const(0, bitwidth=4), falsecase=shifted)
+    return out
+```
+",<_io.TextIOWrapper name='./knowledge_base/lfsr.txt' mode='r' encoding='utf-8'>,lfsr.txt
+dual_comparator,"[Keyword]: dual_comparator
+
+[Design Category]: Combinational Logic
+
+[Design Function Description]:
+The circuit is a dual comparator that compares two 8-bit numbers, `a` and `b`. It can perform both signed and unsigned comparisons based on the `mode` input. If `mode` is high (1), it performs a signed comparison; if `mode` is low (0), it performs an unsigned comparison. The output `agtb` indicates whether `a` is greater than `b`.
+
+[Input Signal Description]:
+- `a[7:0]`: An 8-bit input signal representing the first number to be compared.
+- `b[7:0]`: An 8-bit input signal representing the second number to be compared.
+- `mode`: A 1-bit input signal that determines the type of comparison. If `mode` is 1, a signed comparison is performed; if `mode` is 0, an unsigned comparison is performed.
+
+[Output Signal Description]:
+- `agtb`: A 1-bit output signal that indicates the result of the comparison. It is high (1) if `a` is greater than `b` according to the selected comparison mode, and low (0) otherwise.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(a, b, mode):
+    sign_a = a[7]
+    sign_b = b[7]
+    signed_gt = ((~sign_a) & sign_b) | ((sign_a == sign_b) & (a > b))
+    unsigned_gt = a > b
+
+    agtb = pyrtl.WireVector(bitwidth=1, name='agtb')
+    agtb <<= pyrtl.select(mode, truecase=signed_gt, falsecase=unsigned_gt)
+    return agtb
+```
+",<_io.TextIOWrapper name='./knowledge_base/dual_comparator.txt' mode='r' encoding='utf-8'>,dual_comparator.txt
+Count1to10,"[Keyword]: Count1to10
+
+[Design Category]: Sequential Logic
+
+[Design Function Description]:
+This design is a 4-bit decade counter that counts from 1 to 10. Upon reaching 10, it resets back to 1. The counter is synchronous with the clock signal and can be reset asynchronously to 1.
+
+PyRTL refinement: the prose mentions asynchronous reset, but the provided implementation behaves synchronously. The PyRTL version follows the implementation and uses register initialization plus clocked reset handling.
+
+[Input Signal Description]:
+clk: Clock signal that triggers the counter to increment on each rising edge.
+reset: Asynchronous reset signal that sets the counter to 1 when asserted.
+
+[Output Signal Description]:
+q[3:0]: 4-bit output representing the current count value of the counter, ranging from 1 to 10.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(reset):
+    q = pyrtl.Register(bitwidth=4, name='q', reset_value=1)
+    incremented = (q + pyrtl.Const(1, bitwidth=4))[0:4]
+    wrapped = pyrtl.select(q == pyrtl.Const(10, bitwidth=4), truecase=pyrtl.Const(1, bitwidth=4), falsecase=incremented)
+    q.next <<= pyrtl.select(reset, truecase=pyrtl.Const(1, bitwidth=4), falsecase=wrapped)
+    return q
+```
+",<_io.TextIOWrapper name='./knowledge_base/Count1to10.txt' mode='r' encoding='utf-8'>,Count1to10.txt
+traffic_light,"[Keyword]: traffic_light
+
+[Design Category]: Control Circuits
+
+[Design Function Description]:
+This design implements a traffic light controller for a two-way intersection. It manages the traffic lights for two directions (A and B) by cycling through states that control the red, yellow, and green lights based on the current state and sensor inputs.
+
+PyRTL refinement: there is no explicit reset input in the original source, so the controller starts in state 0 using the register `reset_value`.
+
+[Input Signal Description]:
+- clk: Clock signal used to synchronize the state transitions.
+- Sa: Sensor input for direction A, indicating the presence of vehicles.
+- Sb: Sensor input for direction B, indicating the presence of vehicles.
+
+[Output Signal Description]:
+- Ra, Rb: Red light control signals for directions A and B, respectively.
+- Ga, Gb: Green light control signals for directions A and B, respectively.
+- Ya, Yb: Yellow light control signals for directions A and B, respectively.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(Sa, Sb):
+    state = pyrtl.Register(bitwidth=4, name='state', reset_value=0)
+
+    is0 = state == pyrtl.Const(0, bitwidth=4)
+    is1 = state == pyrtl.Const(1, bitwidth=4)
+    is2 = state == pyrtl.Const(2, bitwidth=4)
+    is3 = state == pyrtl.Const(3, bitwidth=4)
+    is4 = state == pyrtl.Const(4, bitwidth=4)
+    is5 = state == pyrtl.Const(5, bitwidth=4)
+    is6 = state == pyrtl.Const(6, bitwidth=4)
+    is7 = state == pyrtl.Const(7, bitwidth=4)
+    is8 = state == pyrtl.Const(8, bitwidth=4)
+    is9 = state == pyrtl.Const(9, bitwidth=4)
+    is10 = state == pyrtl.Const(10, bitwidth=4)
+    is11 = state == pyrtl.Const(11, bitwidth=4)
+    is12 = state == pyrtl.Const(12, bitwidth=4)
+
+    next_state = state
+    next_state = pyrtl.select(is0, truecase=pyrtl.Const(1, bitwidth=4), falsecase=next_state)
+    next_state = pyrtl.select(is1, truecase=pyrtl.Const(2, bitwidth=4), falsecase=next_state)
+    next_state = pyrtl.select(is2, truecase=pyrtl.Const(3, bitwidth=4), falsecase=next_state)
+    next_state = pyrtl.select(is3, truecase=pyrtl.Const(4, bitwidth=4), falsecase=next_state)
+    next_state = pyrtl.select(is4, truecase=pyrtl.Const(5, bitwidth=4), falsecase=next_state)
+    next_state = pyrtl.select(is5, truecase=pyrtl.select(Sb, truecase=pyrtl.Const(6, bitwidth=4), falsecase=pyrtl.Const(5, bitwidth=4)), falsecase=next_state)
+    next_state = pyrtl.select(is6, truecase=pyrtl.Const(7, bitwidth=4), falsecase=next_state)
+    next_state = pyrtl.select(is7, truecase=pyrtl.Const(8, bitwidth=4), falsecase=next_state)
+    next_state = pyrtl.select(is8, truecase=pyrtl.Const(9, bitwidth=4), falsecase=next_state)
+    next_state = pyrtl.select(is9, truecase=pyrtl.Const(10, bitwidth=4), falsecase=next_state)
+    next_state = pyrtl.select(is10, truecase=pyrtl.Const(11, bitwidth=4), falsecase=next_state)
+    next_state = pyrtl.select(is11, truecase=pyrtl.select(Sa | ~Sb, truecase=pyrtl.Const(12, bitwidth=4), falsecase=pyrtl.Const(11, bitwidth=4)), falsecase=next_state)
+    next_state = pyrtl.select(is12, truecase=pyrtl.Const(0, bitwidth=4), falsecase=next_state)
+    state.next <<= next_state
+
+    Ra = pyrtl.WireVector(bitwidth=1, name='Ra')
+    Rb = pyrtl.WireVector(bitwidth=1, name='Rb')
+    Ga = pyrtl.WireVector(bitwidth=1, name='Ga')
+    Gb = pyrtl.WireVector(bitwidth=1, name='Gb')
+    Ya = pyrtl.WireVector(bitwidth=1, name='Ya')
+    Yb = pyrtl.WireVector(bitwidth=1, name='Yb')
+
+    Ra <<= is7 | is8 | is9 | is10 | is11 | is12
+    Rb <<= is0 | is1 | is2 | is3 | is4 | is5 | is6
+    Ga <<= is0 | is1 | is2 | is3 | is4 | is5
+    Gb <<= is7 | is8 | is9 | is10 | is11
+    Ya <<= is6
+    Yb <<= is12
+    return Ra, Rb, Ga, Gb, Ya, Yb
+```
+",<_io.TextIOWrapper name='./knowledge_base/traffic_light.txt' mode='r' encoding='utf-8'>,traffic_light.txt
+moore,"[Keyword]: moore
+
+[Design Category]: Sequential Logic
+
+[Design Function Description]:
+This design implements a Moore state machine that detects a sequence of two consecutive '1's in the input stream. The state machine has three states: `zero`, `one1`, and `two1s`. The output is asserted when the state machine reaches the `two1s` state, indicating that the sequence ""11"" has been detected.
+
+[Input Signal Description]:
+- `clk`: Clock signal used to synchronize the state transitions.
+- `reset`: Asynchronous reset signal to initialize the state machine to the `zero` state.
+- `in`: Input signal that the state machine monitors for the sequence ""11"".
+
+[Output Signal Description]:
+- `out`: Output signal that is asserted (set to 1) when the state machine detects the sequence ""11"" in the input stream. It remains 0 otherwise.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(reset, in_):  # in_ corresponds to the original Verilog signal named ""in""
+    zero = pyrtl.Const(0, bitwidth=2)
+    one1 = pyrtl.Const(1, bitwidth=2)
+    two1s = pyrtl.Const(2, bitwidth=2)
+
+    state = pyrtl.Register(bitwidth=2, name='state', reset_value=0)
+    next_state = state
+    next_state = pyrtl.select(state == zero, truecase=pyrtl.select(in_, truecase=one1, falsecase=zero), falsecase=next_state)
+    next_state = pyrtl.select(state == one1, truecase=pyrtl.select(in_, truecase=two1s, falsecase=zero), falsecase=next_state)
+    next_state = pyrtl.select(state == two1s, truecase=pyrtl.select(in_, truecase=two1s, falsecase=zero), falsecase=next_state)
+    state.next <<= pyrtl.select(reset, truecase=zero, falsecase=next_state)
+
+    out = pyrtl.WireVector(bitwidth=1, name='out')
+    out <<= state == two1s
+    return out
+```
+",<_io.TextIOWrapper name='./knowledge_base/moore.txt' mode='r' encoding='utf-8'>,moore.txt
+Edgedetect,"[Keyword]: Edgedetect
+
+[Design Category]: Sequential Logic
+
+[Design Function Description]:
+The circuit detects positive edges on each bit of an 8-bit input signal. It outputs a corresponding 8-bit signal where each bit indicates whether a positive edge (a transition from 0 to 1) has occurred on the respective input bit.
+
+[Input Signal Description]:
+- clk: Clock signal used to synchronize the detection of positive edges.
+- in[7:0]: 8-bit input signal on which positive edge detection is performed.
+
+[Output Signal Description]:
+- pedge[7:0]: 8-bit output signal where each bit is set to 1 if a positive edge is detected on the corresponding input bit, otherwise it is set to 0.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(in_):  # in_ corresponds to the original Verilog signal named ""in""
+    prev = pyrtl.Register(bitwidth=8, name='prev', reset_value=0)
+    pedge = pyrtl.WireVector(bitwidth=8, name='pedge')
+    pedge <<= in_ & ~prev
+    prev.next <<= in_
+    return pedge
+```
+",<_io.TextIOWrapper name='./knowledge_base/Edgedetect.txt' mode='r' encoding='utf-8'>,Edgedetect.txt
+shift_reg.sv,"[Keyword]: shift_reg.sv
+
+[Design Category]: Sequential Logic
+
+[Design Function Description]:
+This design implements a simple shift register with configurable depth and data type. A shift register is a sequential logic circuit that is used to store and shift data. The data is shifted in on each clock cycle, and the output is the data that has been shifted through the register.
+
+PyRTL refinement: the generic `Depth` parameter is represented as the Python argument `depth`, and the active-low reset input clears every stage to zero.
+
+[Input Signal Description]:
+- `clk_i`: Clock input signal that drives the shifting operation.
+- `rst_ni`: Asynchronous reset input signal, active low, used to reset the shift register.
+- `d_i`: Input data of type `dtype` that is to be shifted into the register.
+
+[Output Signal Description]:
+- `d_o`: Output data of type `dtype` that represents the data shifted out of the register after passing through the specified depth.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(rst_ni, d_i, depth=1):
+    bitwidth = len(d_i)
+    if depth <= 0:
+        d_o = pyrtl.WireVector(bitwidth=bitwidth, name='d_o')
+        d_o <<= d_i
+        return d_o
+
+    stages = [
+        pyrtl.Register(bitwidth=bitwidth, name=f'stage_{idx}', reset_value=0)
+        for idx in range(depth)
+    ]
+
+    for idx, stage in enumerate(stages):
+        source = d_i if idx == 0 else stages[idx - 1]
+        stage.next <<= pyrtl.select(rst_ni, truecase=source, falsecase=pyrtl.Const(0, bitwidth=bitwidth))
+
+    d_o = pyrtl.WireVector(bitwidth=bitwidth, name='d_o')
+    d_o <<= stages[-1]
+    return d_o
+```
+",<_io.TextIOWrapper name='./knowledge_base/shift_reg.sv.txt' mode='r' encoding='utf-8'>,shift_reg.sv.txt
+Gates4,"[Keyword]: Gates4
+
+[Design Category]: Combinational Logic
+
+[Design Function Description]:
+This design implements basic logic operations (AND, OR, XOR) on a 4-bit input vector. It computes the logical AND, OR, and XOR of all four input bits and outputs the results separately.
+
+[Input Signal Description]:
+in[3:0]: A 4-bit input signal where each bit can be independently set to 0 or 1. The bits are used as inputs for the AND, OR, and XOR operations.
+
+[Output Signal Description]:
+out_and: Outputs the result of the logical AND operation on all four input bits.
+out_or: Outputs the result of the logical OR operation on all four input bits.
+out_xor: Outputs the result of the logical XOR operation on all four input bits.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(in_):  # in_ corresponds to the original Verilog signal named ""in""
+    out_and = pyrtl.WireVector(bitwidth=1, name='out_and')
+    out_or = pyrtl.WireVector(bitwidth=1, name='out_or')
+    out_xor = pyrtl.WireVector(bitwidth=1, name='out_xor')
+
+    out_and <<= in_[0] & in_[1] & in_[2] & in_[3]
+    out_or <<= in_[0] | in_[1] | in_[2] | in_[3]
+    out_xor <<= in_[0] ^ in_[1] ^ in_[2] ^ in_[3]
+    return out_and, out_or, out_xor
+```
+",<_io.TextIOWrapper name='./knowledge_base/Gates4.txt' mode='r' encoding='utf-8'>,Gates4.txt
+timer,"[Keyword]: timer
+
+[Design Category]: Sequential Logic
+
+[Design Function Description]:
+This design implements a 2-second countdown timer. The timer starts counting down from a preset value when triggered and signals when the countdown reaches zero.
+
+[Input Signal Description]:
+- clk: Clock signal used to synchronize the timer operations.
+- rst_n: Active-low reset signal to initialize or reset the timer.
+- timer_start: Signal to start the timer countdown from the preset value.
+- timer_tick: Signal that ticks at 60Hz, used to decrement the timer value.
+
+[Output Signal Description]:
+- timer_up: Output signal that indicates the timer has reached zero.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(rst_n, timer_start, timer_tick):
+    timer_q = pyrtl.Register(bitwidth=7, name='timer_q', reset_value=0)
+    decremented = (timer_q - pyrtl.Const(1, bitwidth=7))[0:7]
+    tick_value = pyrtl.select(timer_q == pyrtl.Const(0, bitwidth=7), truecase=pyrtl.Const(0, bitwidth=7), falsecase=decremented)
+    next_value = pyrtl.select(
+        timer_start,
+        truecase=pyrtl.Const(0x7F, bitwidth=7),
+        falsecase=pyrtl.select(timer_tick, truecase=tick_value, falsecase=timer_q),
+    )
+    timer_q.next <<= pyrtl.select(~rst_n, truecase=pyrtl.Const(0, bitwidth=7), falsecase=next_value)
+
+    timer_up = pyrtl.WireVector(bitwidth=1, name='timer_up')
+    timer_up <<= timer_q == pyrtl.Const(0, bitwidth=7)
+    return timer_up
+```
+",<_io.TextIOWrapper name='./knowledge_base/timer.txt' mode='r' encoding='utf-8'>,timer.txt
+carry_save_adder,"[Keyword]: carry_save_adder
+
+[Design Category]: Arithmetic Circuits
+
+[Design Function Description]:
+The design implements a carry-save adder (CSA) that adds four 4-bit numbers (a, b, c, and d) and produces a 5-bit sum and a carry-out. The CSA is a type of digital adder used to compute the sum of three or more n-bit numbers in binary. It is particularly useful in multi-operand addition scenarios, such as in digital signal processing and computer arithmetic.
+
+[Input Signal Description]:
+- a[3:0]: A 4-bit input operand.
+- b[3:0]: A 4-bit input operand.
+- c[3:0]: A 4-bit input operand.
+- d[3:0]: A 4-bit input operand.
+
+These inputs represent the four numbers to be added together.
+
+[Output Signal Description]:
+- sum[4:0]: A 5-bit output representing the sum of the four input operands.
+- cout: A 1-bit output representing the carry-out from the most significant bit of the addition.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(a, b, c, d):
+    total = (
+        pyrtl.concat(pyrtl.Const(0, bitwidth=2), a)
+        + pyrtl.concat(pyrtl.Const(0, bitwidth=2), b)
+        + pyrtl.concat(pyrtl.Const(0, bitwidth=2), c)
+        + pyrtl.concat(pyrtl.Const(0, bitwidth=2), d)
+    )
+    sum_ = pyrtl.WireVector(bitwidth=5, name='sum')
+    cout = pyrtl.WireVector(bitwidth=1, name='cout')
+    sum_ <<= total[0:5]
+    cout <<= total[5]
+    return sum_, cout
+```
+",<_io.TextIOWrapper name='./knowledge_base/carry_save_adder.txt' mode='r' encoding='utf-8'>,carry_save_adder.txt
+Countbcd,"[Keyword]: Countbcd
+
+[Design Category]: Sequential Logic
+
+[Design Function Description]:
+This design implements a 4-digit BCD (Binary-Coded Decimal) counter. The counter increments on each clock cycle and resets to zero when it reaches 9999. The `ena` signals indicate when each BCD digit is at its maximum value of 9, enabling the next higher digit to increment.
+
+[Input Signal Description]:
+- `clk`: Clock signal that drives the counter.
+- `reset`: Synchronous active-high reset signal that initializes the counter to zero when asserted.
+
+[Output Signal Description]:
+- `ena[3:1]`: Enable signals for each BCD digit, indicating when the respective digit is at its maximum value of 9.
+- `q[15:0]`: 16-bit output representing the 4-digit BCD counter value, with each 4-bit segment representing a single BCD digit.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(reset):
+    d0 = pyrtl.Register(bitwidth=4, name='digit0', reset_value=0)
+    d1 = pyrtl.Register(bitwidth=4, name='digit1', reset_value=0)
+    d2 = pyrtl.Register(bitwidth=4, name='digit2', reset_value=0)
+    d3 = pyrtl.Register(bitwidth=4, name='digit3', reset_value=0)
+
+    ena1 = d0 == pyrtl.Const(9, bitwidth=4)
+    ena2 = ena1 & (d1 == pyrtl.Const(9, bitwidth=4))
+    ena3 = ena2 & (d2 == pyrtl.Const(9, bitwidth=4))
+
+    inc0 = (d0 + pyrtl.Const(1, bitwidth=4))[0:4]
+    inc1 = (d1 + pyrtl.Const(1, bitwidth=4))[0:4]
+    inc2 = (d2 + pyrtl.Const(1, bitwidth=4))[0:4]
+    inc3 = (d3 + pyrtl.Const(1, bitwidth=4))[0:4]
+
+    d0_next = pyrtl.select(d0 == pyrtl.Const(9, bitwidth=4), truecase=pyrtl.Const(0, bitwidth=4), falsecase=inc0)
+    d1_advanced = pyrtl.select(d1 == pyrtl.Const(9, bitwidth=4), truecase=pyrtl.Const(0, bitwidth=4), falsecase=inc1)
+    d2_advanced = pyrtl.select(d2 == pyrtl.Const(9, bitwidth=4), truecase=pyrtl.Const(0, bitwidth=4), falsecase=inc2)
+    d3_advanced = pyrtl.select(d3 == pyrtl.Const(9, bitwidth=4), truecase=pyrtl.Const(0, bitwidth=4), falsecase=inc3)
+
+    d0.next <<= pyrtl.select(reset, truecase=pyrtl.Const(0, bitwidth=4), falsecase=d0_next)
+    d1.next <<= pyrtl.select(reset, truecase=pyrtl.Const(0, bitwidth=4), falsecase=pyrtl.select(ena1, truecase=d1_advanced, falsecase=d1))
+    d2.next <<= pyrtl.select(reset, truecase=pyrtl.Const(0, bitwidth=4), falsecase=pyrtl.select(ena2, truecase=d2_advanced, falsecase=d2))
+    d3.next <<= pyrtl.select(reset, truecase=pyrtl.Const(0, bitwidth=4), falsecase=pyrtl.select(ena3, truecase=d3_advanced, falsecase=d3))
+
+    ena = pyrtl.WireVector(bitwidth=3, name='ena')
+    q = pyrtl.WireVector(bitwidth=16, name='q')
+    ena <<= pyrtl.concat(ena3, ena2, ena1)
+    q <<= pyrtl.concat(d3, d2, d1, d0)
+    return ena, q
+```
+",<_io.TextIOWrapper name='./knowledge_base/Countbcd.txt' mode='r' encoding='utf-8'>,Countbcd.txt
+adder,"[Keyword]: adder
+
+[Design Category]: Arithmetic Circuits
+
+[Design Function Description]:
+This design implements an 8-bit binary adder. It takes two 8-bit binary numbers as inputs and produces an 8-bit sum and a carry-out as outputs.
+
+[Input Signal Description]:
+a[7:0]: An 8-bit input signal representing the first operand for the addition.
+b[7:0]: An 8-bit input signal representing the second operand for the addition.
+
+[Output Signal Description]:
+s[7:0]: An 8-bit output signal representing the sum of the two input operands.
+c: A 1-bit output signal representing the carry-out from the most significant bit of the addition.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(a, b):
+    total = pyrtl.concat(pyrtl.Const(0, bitwidth=1), a) + pyrtl.concat(pyrtl.Const(0, bitwidth=1), b)
+    c = pyrtl.WireVector(bitwidth=1, name='c')
+    s = pyrtl.WireVector(bitwidth=8, name='s')
+    c <<= total[8]
+    s <<= total[0:8]
+    return c, s
+```
+",<_io.TextIOWrapper name='./knowledge_base/adder.txt' mode='r' encoding='utf-8'>,adder.txt
+Count15,"[Keyword]: Count15
+
+[Design Category]: Sequential Logic
+
+[Design Function Description]:
+This design is a 4-bit binary counter with a synchronous reset. The counter increments on each positive edge of the clock and resets to zero when it reaches the maximum count of 15 or when the reset signal is active.
+
+[Input Signal Description]:
+- clk: Clock signal that triggers the counter to increment on its positive edge.
+- reset: Synchronous active-high reset signal that sets the counter output to zero when asserted.
+
+[Output Signal Description]:
+- q[3:0]: 4-bit output representing the current count value of the counter.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(reset):
+    q = pyrtl.Register(bitwidth=4, name='q', reset_value=0)
+    incremented = (q + pyrtl.Const(1, bitwidth=4))[0:4]
+    wrapped = pyrtl.select(q == pyrtl.Const(15, bitwidth=4), truecase=pyrtl.Const(0, bitwidth=4), falsecase=incremented)
+    q.next <<= pyrtl.select(reset, truecase=pyrtl.Const(0, bitwidth=4), falsecase=wrapped)
+    return q
+```
+",<_io.TextIOWrapper name='./knowledge_base/Count15.txt' mode='r' encoding='utf-8'>,Count15.txt
+2012 q1g,"[Keyword]: 2012 q1g
+
+[Design Category]: Combinational Logic
+
+[Design Function Description]:
+This circuit implements a Boolean function using AND, OR, and NOT gates.
+It evaluates a 4-bit input vector and produces a single-bit output based
+on a sum-of-products logical expression.
+
+[Input Signal Description]:
+x[4:1]: A 4-bit input vector. Each bit contributes to the logical conditions:
+    x[1] → least significant bit
+    x[4] → most significant bit
+
+[Output Signal Description]:
+f: A single-bit output representing the result of the Boolean expression.
+
+[Design Detail]:
+f = (~x[1] & x[3]) 
+    | (~x[2] & ~x[3] & ~x[4]) 
+    | (x[1] & ~x[2] & x[3] & ~x[4]) 
+    | (x[2] & x[3] & x[4])
+
+import pyrtl
+
+# Define `Inputs` and `Outputs`.
+x = pyrtl.Input(bitwidth=4, name=""x"")
+f = pyrtl.Output(bitwidth=1, name=""f"")
+
+# Map PyRTL indexing to match Verilog x[4:1]
+x1 = x[0]
+x2 = x[1]
+x3 = x[2]
+x4 = x[3]
+
+# Define the logic.
+term1 = (~x1) & x3
+term2 = (~x2) & (~x3) & (~x4)
+term3 = x1 & (~x2) & x3 & (~x4)
+term4 = x2 & x3 & x4
+
+f <<= term1 | term2 | term3 | term4
+
+# Simulate various values for `x`.
+sim = pyrtl.Simulation()
+
+sim.step_multiple({
+    ""x"": [
+        0b0000,
+        0b0001,
+        0b0010,
+        0b0100,
+        0b0111,
+        0b1111
+    ]
+})
+
+# Display simulation traces.
+sim.tracer.render_trace()",<_io.TextIOWrapper name='./knowledge_base/ex0.txt' mode='r' encoding='utf-8'>,ex0.txt
+Rotate_8,"[Keyword]: Rotate_8
+
+[Design Category]: Arithmetic Circuits
+
+[Design Function Description]:
+The design implements an 8-bit barrel shifter that can perform both left and right rotations. The direction of the shift is determined by the control signal LR. The amount of rotation is specified by a 3-bit input, allowing for shifts of 0 to 7 positions.
+
+[Input Signal Description]:
+- `num[7:0]`: An 8-bit input signal representing the number to be rotated.
+- `amt[2:0]`: A 3-bit input signal specifying the number of positions to rotate the input number.
+- `LR`: A control signal that determines the direction of the rotation. If LR is high, a left rotation is performed; if low, a right rotation is performed.
+
+[Output Signal Description]:
+- `real_out[7:0]`: An 8-bit output signal that provides the result of the rotation operation based on the input number, the amount of rotation, and the direction specified by LR.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(num, amt, LR):
+    right1 = pyrtl.select(amt[0], truecase=pyrtl.concat(num[0:1], num[1:8]), falsecase=num)
+    right2 = pyrtl.select(amt[1], truecase=pyrtl.concat(right1[0:2], right1[2:8]), falsecase=right1)
+    right4 = pyrtl.select(amt[2], truecase=pyrtl.concat(right2[0:4], right2[4:8]), falsecase=right2)
+
+    left1 = pyrtl.select(amt[0], truecase=pyrtl.concat(num[0:7], num[7:8]), falsecase=num)
+    left2 = pyrtl.select(amt[1], truecase=pyrtl.concat(left1[0:6], left1[6:8]), falsecase=left1)
+    left4 = pyrtl.select(amt[2], truecase=pyrtl.concat(left2[0:4], left2[4:8]), falsecase=left2)
+
+    real_out = pyrtl.WireVector(bitwidth=8, name='real_out')
+    real_out <<= pyrtl.select(LR, truecase=left4, falsecase=right4)
+    return real_out
+```
+",<_io.TextIOWrapper name='./knowledge_base/Rotate_8.txt' mode='r' encoding='utf-8'>,Rotate_8.txt
+Reduction,"[Keyword]: Reduction
+
+[Design Category]: Combinational Logic
+
+[Design Function Description]:
+This design calculates the parity of an 8-bit input vector. The parity is determined by performing a bitwise XOR operation across all bits of the input. The output is 1 if the number of 1s in the input is odd, and 0 if the number of 1s is even.
+
+[Input Signal Description]:
+in[7:0]: An 8-bit input signal whose parity is to be calculated.
+
+[Output Signal Description]:
+parity: A single-bit output signal that represents the parity of the input. It is 1 if the number of 1s in the input is odd, and 0 if even.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(in_):  # in_ corresponds to the original Verilog signal named ""in""
+    parity = pyrtl.WireVector(bitwidth=1, name='parity')
+    parity <<= in_[0] ^ in_[1] ^ in_[2] ^ in_[3] ^ in_[4] ^ in_[5] ^ in_[6] ^ in_[7]
+    return parity
+```
+",<_io.TextIOWrapper name='./knowledge_base/Reduction.txt' mode='r' encoding='utf-8'>,Reduction.txt
+binary_decoder_3x8,"[Keyword]: binary_decoder_3x8
+
+[Design Category]: Combinational Logic
+
+[Design Function Description]:
+The circuit is a 3-to-8 binary decoder. It takes a 3-bit binary input and decodes it into an 8-bit output, where only one of the output bits is set to '1' based on the input value, and the rest are '0'. This is achieved by using two 2-to-4 decoders, with the most significant bit of the input used to enable one of the two decoders.
+
+[Input Signal Description]:
+a[2:0]: A 3-bit input signal that represents a binary number from 0 to 7. This input is used to determine which one of the 8 output lines will be activated.
+
+[Output Signal Description]:
+bcode[7:0]: An 8-bit output signal where only one bit is set to '1' based on the input value, and the rest are '0'. This represents the decoded output of the 3-to-8 decoder.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(a):
+    terms = [a == pyrtl.Const(idx, bitwidth=3) for idx in range(8)]
+    bcode = pyrtl.WireVector(bitwidth=8, name='bcode')
+    bcode <<= pyrtl.concat(*reversed(terms))
+    return bcode
+```
+",<_io.TextIOWrapper name='./knowledge_base/binary_decoder_3x8.txt' mode='r' encoding='utf-8'>,binary_decoder_3x8.txt
+Bcdadd4,"[Keyword]: Bcdadd4
+
+[Design Category]: Arithmetic Circuits
+
+[Design Function Description]:
+The design implements a 16-bit Binary Coded Decimal (BCD) adder. It takes two 16-bit BCD numbers and a carry-in as inputs and produces a 16-bit BCD sum and a carry-out. The addition is performed in 4-bit BCD segments.
+
+[Input Signal Description]:
+- a[15:0]: A 16-bit input representing the first BCD number.
+- b[15:0]: A 16-bit input representing the second BCD number.
+- cin: A single-bit input representing the initial carry-in for the least significant BCD digit.
+
+[Output Signal Description]:
+- cout: A single-bit output representing the carry-out from the most significant BCD digit.
+- sum[15:0]: A 16-bit output representing the BCD sum of the inputs a and b.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def _bcd_digit_add(a_digit, b_digit, carry_in):
+    temp = (
+        pyrtl.concat(pyrtl.Const(0, bitwidth=1), a_digit)
+        + pyrtl.concat(pyrtl.Const(0, bitwidth=1), b_digit)
+        + pyrtl.concat(pyrtl.Const(0, bitwidth=4), carry_in)
+    )
+    needs_correction = temp > pyrtl.Const(9, bitwidth=5)
+    corrected = (temp + pyrtl.Const(6, bitwidth=5))[0:5]
+    digit_sum = pyrtl.select(needs_correction, truecase=corrected[0:4], falsecase=temp[0:4])
+    digit_cout = pyrtl.select(
+        needs_correction,
+        truecase=pyrtl.Const(1, bitwidth=1),
+        falsecase=pyrtl.Const(0, bitwidth=1),
+    )
+    return digit_sum, digit_cout
+
+def TopModule(a, b, cin):
+    s0, c0 = _bcd_digit_add(a[0:4], b[0:4], cin)
+    s1, c1 = _bcd_digit_add(a[4:8], b[4:8], c0)
+    s2, c2 = _bcd_digit_add(a[8:12], b[8:12], c1)
+    s3, cout = _bcd_digit_add(a[12:16], b[12:16], c2)
+
+    sum_ = pyrtl.WireVector(bitwidth=16, name='sum')
+    sum_ <<= pyrtl.concat(s3, s2, s1, s0)
+    return cout, sum_
+```
+",<_io.TextIOWrapper name='./knowledge_base/Bcdadd4.txt' mode='r' encoding='utf-8'>,Bcdadd4.txt
+dual_address_rom,"[Keyword]: dual_address_rom
+
+[Design Category]: Memory Circuits
+
+[Design Function Description]:
+The design is a dual-port ROM (Read-Only Memory) module that allows reading from two separate addresses simultaneously. It includes a testbench to verify its functionality. The ROM is initialized with predefined data values, and the module supports enabling and disabling of each port independently.
+
+PyRTL refinement: `wr_en` is treated as a read qualifier for port 0, not as a real ROM write signal. Disabled outputs drive zero because PyRTL does not model high-impedance outputs in this style.
+
+[Input Signal Description]:
+- `clk`: Clock signal used to synchronize the operations within the ROM.
+- `wr_en`: Write enable signal, although typically ROMs do not support writing; this signal is used here to control the address loading.
+- `addr_in_0`: 4-bit address input for port 0, used to select which data to read from the ROM.
+- `addr_in_1`: 4-bit address input for port 1, used to select which data to read from the ROM.
+- `port_en_0`: Enable signal for port 0, allowing data to be read from the ROM when high.
+- `port_en_1`: Enable signal for port 1, allowing data to be read from the ROM when high.
+
+[Output Signal Description]:
+- `data_out_0`: 8-bit data output from port 0, providing the data stored at the address specified by `addr_in_0` when `port_en_0` is high.
+- `data_out_1`: 8-bit data output from port 1, providing the data stored at the address specified by `addr_in_1` when `port_en_1` is high.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(clk, wr_en, addr_in_0, addr_in_1, port_en_0, port_en_1):
+    romdata = [
+        0x24, 0x23, 0xE2, 0x21,
+        0x45, 0xAE, 0xCB, 0x00,
+        0xA3, 0x2A, 0xEC, 0x22,
+        0x40, 0xA0, 0x0C, 0x00,
+    ]
+    rom = pyrtl.RomBlock(
+        bitwidth=8,
+        addrwidth=4,
+        romdata=romdata,
+        name='rom',
+        max_read_ports=2,
+        asynchronous=True,
+    )
+
+    data_out_0 = pyrtl.WireVector(bitwidth=8, name='data_out_0')
+    data_out_1 = pyrtl.WireVector(bitwidth=8, name='data_out_1')
+    data_out_0 <<= pyrtl.select(port_en_0 & wr_en, truecase=rom[addr_in_0], falsecase=pyrtl.Const(0, bitwidth=8))
+    data_out_1 <<= pyrtl.select(port_en_1, truecase=rom[addr_in_1], falsecase=pyrtl.Const(0, bitwidth=8))
+    return data_out_0, data_out_1
+```
+",<_io.TextIOWrapper name='./knowledge_base/dual_address_rom.txt' mode='r' encoding='utf-8'>,dual_address_rom.txt
+Count10,"[Keyword]: Count10
+
+[Design Category]: Sequential Logic
+
+[Design Function Description]:
+This design is a 4-bit decade counter that counts from 0 to 9. It increments the count on each positive edge of the clock signal. When the count reaches 9, it resets back to 0. The counter can also be reset to 0 synchronously when the reset signal is high.
+
+[Input Signal Description]:
+- clk: Clock signal that triggers the counter to increment on its positive edge.
+- reset: Synchronous active-high reset signal that sets the counter to 0 when high.
+
+[Output Signal Description]:
+- q[3:0]: 4-bit output representing the current count value of the counter, ranging from 0 to 9.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(reset):
+    q = pyrtl.Register(bitwidth=4, name='q', reset_value=0)
+    incremented = (q + pyrtl.Const(1, bitwidth=4))[0:4]
+    wrapped = pyrtl.select(q == pyrtl.Const(9, bitwidth=4), truecase=pyrtl.Const(0, bitwidth=4), falsecase=incremented)
+    q.next <<= pyrtl.select(reset, truecase=pyrtl.Const(0, bitwidth=4), falsecase=wrapped)
+    return q
+```
+",<_io.TextIOWrapper name='./knowledge_base/Count10.txt' mode='r' encoding='utf-8'>,Count10.txt
+Popcount255,"[Keyword]: Popcount255
+
+[Design Category]: Combinational Logic
+
+[Design Function Description]:
+The circuit counts the number of '1's in a 255-bit input vector and outputs the count as an 8-bit number.
+
+[Input Signal Description]:
+in[254:0]: A 255-bit input signal where each bit can be either '0' or '1'.
+
+[Output Signal Description]:
+out[7:0]: An 8-bit output signal representing the count of '1's present in the input vector.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(in_):  # in_ corresponds to the original Verilog signal named ""in""
+    count = pyrtl.Const(0, bitwidth=8)
+    for idx in range(255):
+        addend = pyrtl.concat(pyrtl.Const(0, bitwidth=7), in_[idx])
+        count = (count + addend)[0:8]
+
+    out = pyrtl.WireVector(bitwidth=8, name='out')
+    out <<= count
+    return out
+```
+",<_io.TextIOWrapper name='./knowledge_base/Popcount255.txt' mode='r' encoding='utf-8'>,Popcount255.txt
+Mux256to1,"[Keyword]: Mux256to1
+
+[Design Category]: Combinational Logic
+
+[Design Function Description]:
+This design implements a 256-to-1 multiplexer. It selects one bit from a 256-bit input vector based on an 8-bit selection signal. The selected bit is then output.
+
+[Input Signal Description]:
+- in[255:0]: A 256-bit wide input vector containing the data from which a single bit will be selected.
+- sel[7:0]: An 8-bit selection signal that determines which bit from the input vector is output. It can represent values from 0 to 255.
+
+[Output Signal Description]:
+- out: A single bit output that corresponds to the bit selected from the input vector based on the value of the selection signal.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(in_, sel):  # in_ corresponds to the original Verilog signal named ""in""
+    selected = pyrtl.Const(0, bitwidth=1)
+    for idx in range(256):
+        selected = pyrtl.select(
+            sel == pyrtl.Const(idx, bitwidth=8),
+            truecase=in_[idx],
+            falsecase=selected,
+        )
+
+    out = pyrtl.WireVector(bitwidth=1, name='out')
+    out <<= selected
+    return out
+```
+",<_io.TextIOWrapper name='./knowledge_base/Mux256to1.txt' mode='r' encoding='utf-8'>,Mux256to1.txt
+Fsm serial,"[Keyword]: Fsm serial
+
+[Design Category]: Sequential Logic
+
+[Design Function Description]:
+This design implements a finite state machine (FSM) that processes an input signal `in` and transitions through different states based on the input and a counter. The FSM has four states: `rd` (read), `rc` (receive), `dn` (done), and `err` (error). The FSM counts up to 8 cycles in the `rc` state and transitions to `dn` or `err` based on the input signal. The `done` output indicates when the FSM has reached the `dn` state.
+
+[Input Signal Description]:
+- `clk`: Clock signal used to synchronize the state transitions.
+- `in`: Input signal that influences state transitions.
+- `reset`: Synchronous reset signal that initializes the FSM to the `rd` state and resets the counter `i`.
+
+[Output Signal Description]:
+- `done`: Output signal that is asserted when the FSM reaches the `dn` state, indicating the completion of a specific sequence.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(reset, in_):  # in_ corresponds to the original Verilog signal named ""in""
+    rc = pyrtl.Const(0, bitwidth=2)
+    dn = pyrtl.Const(1, bitwidth=2)
+    rd = pyrtl.Const(2, bitwidth=2)
+    err = pyrtl.Const(3, bitwidth=2)
+
+    state = pyrtl.Register(bitwidth=2, name='state', reset_value=2)
+    counter = pyrtl.Register(bitwidth=4, name='i', reset_value=0)
+
+    next_state = state
+    next_state = pyrtl.select(state == rd, truecase=pyrtl.select(in_, truecase=rd, falsecase=rc), falsecase=next_state)
+    next_state = pyrtl.select(
+        state == rc,
+        truecase=pyrtl.select(
+            counter == pyrtl.Const(8, bitwidth=4),
+            truecase=pyrtl.select(in_, truecase=dn, falsecase=err),
+            falsecase=rc,
+        ),
+        falsecase=next_state,
+    )
+    next_state = pyrtl.select(state == dn, truecase=pyrtl.select(in_, truecase=rd, falsecase=rc), falsecase=next_state)
+    next_state = pyrtl.select(state == err, truecase=pyrtl.select(in_, truecase=rd, falsecase=err), falsecase=next_state)
+
+    counter_plus = (counter + pyrtl.Const(1, bitwidth=4))[0:4]
+    next_counter = counter
+    next_counter = pyrtl.select((state == rc) & (counter != pyrtl.Const(8, bitwidth=4)), truecase=counter_plus, falsecase=next_counter)
+    next_counter = pyrtl.select((state == err) | (state == dn), truecase=pyrtl.Const(0, bitwidth=4), falsecase=next_counter)
+
+    state.next <<= pyrtl.select(reset, truecase=rd, falsecase=next_state)
+    counter.next <<= pyrtl.select(reset, truecase=pyrtl.Const(0, bitwidth=4), falsecase=next_counter)
+
+    done = pyrtl.WireVector(bitwidth=1, name='done')
+    done <<= state == dn
+    return done
+```
+",<_io.TextIOWrapper name='./knowledge_base/Fsm serial.txt' mode='r' encoding='utf-8'>,Fsm serial.txt
+7Vector1,"[Keyword]: 7Vector1
+
+[Design Category]: Combinational Logic
+
+[Design Function Description]:
+This design is a simple signal splitter that takes a 16-bit input and divides it into two separate 8-bit outputs. The higher 8 bits of the input are assigned to one output, and the lower 8 bits are assigned to another output.
+
+[Input Signal Description]:
+in[15:0]: A 16-bit input signal that is to be split into two 8-bit segments.
+
+[Output Signal Description]:
+out_hi[7:0]: An 8-bit output signal representing the higher 8 bits of the input.
+out_lo[7:0]: An 8-bit output signal representing the lower 8 bits of the input.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(in_):  # in_ corresponds to the original Verilog signal named ""in""
+    out_hi = pyrtl.WireVector(bitwidth=8, name='out_hi')
+    out_lo = pyrtl.WireVector(bitwidth=8, name='out_lo')
+    out_hi <<= in_[8:16]
+    out_lo <<= in_[0:8]
+    return out_hi, out_lo
+```
+",<_io.TextIOWrapper name='./knowledge_base/7Vector1.txt' mode='r' encoding='utf-8'>,7Vector1.txt
+Dff,"[Keyword]: Dff
+
+[Design Category]: Sequential Logic
+
+[Design Function Description]:
+This design is a simple D flip-flop. It captures the value of the input signal 'd' on the rising edge of the clock signal 'clk' and outputs it as 'q'. The output 'q' retains its value until the next rising edge of 'clk'.
+
+[Input Signal Description]:
+clk: Clock signal used to synchronize the data capture. The flip-flop captures the input 'd' on the rising edge of this clock.
+d: Data input signal that is captured by the flip-flop on the rising edge of the clock.
+
+[Output Signal Description]:
+q: The output signal that holds the value of the input 'd' after the rising edge of the clock. It retains this value until the next rising edge of the clock.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(d):
+    q = pyrtl.Register(bitwidth=1, name='q', reset_value=0)
+    q.next <<= d
+    return q
+```
+",<_io.TextIOWrapper name='./knowledge_base/Dff.txt' mode='r' encoding='utf-8'>,Dff.txt

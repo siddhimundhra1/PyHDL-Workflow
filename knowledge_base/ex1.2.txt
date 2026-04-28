@@ -1,0 +1,114 @@
+
+
+
+import inspect
+import pyrtl
+
+# ----------------------------
+# Part 1: Manual Slicing
+# ----------------------------
+
+pixel_in = pyrtl.Input(name="pixel_in", bitwidth=24)
+
+red_in = pixel_in[16:24]
+red_in.name = "red_in"
+green_in = pixel_in[8:16]
+green_in.name = "green_in"
+blue_in = pixel_in[0:8]
+blue_in.name = "blue_in"
+
+red_out = red_in + 0x11
+green_out = green_in + 0x22
+blue_out = blue_in + 0x33
+
+pixel_out = pyrtl.concat(
+    red_out.truncate(8),
+    green_out.truncate(8),
+    blue_out.truncate(8)
+)
+pixel_out.name = "pixel_out"
+
+print("Pixel slicing and concatenation without wire_struct:")
+sim = pyrtl.Simulation()
+sim.step_multiple(provided_inputs={"pixel_in": [0x112233, 0xAABBCC]})
+sim.tracer.render_trace(
+    trace_list=["pixel_in", "red_in", "green_in", "blue_in", "pixel_out"]
+)
+
+# ----------------------------
+# Part 2: Using wire_struct
+# ----------------------------
+
+pyrtl.reset_working_block()
+
+@pyrtl.wire_struct
+class Pixel:
+    red: 8
+    green: 8
+    blue: 8
+
+pixel_in = Pixel(name="pixel_in", concatenated_type=pyrtl.Input)
+
+red_out = pixel_in.red + 0x11
+green_out = pixel_in.green + 0x22
+blue_out = pixel_in.blue + 0x33
+
+pixel_out = Pixel(
+    name="pixel_out",
+    green=green_out,
+    red=red_out,
+    blue=blue_out
+)
+
+print("\nPixel slicing and concatenation with wire_struct:")
+sim = pyrtl.Simulation()
+sim.step_multiple(provided_inputs={"pixel_in": [0x112233, 0xAABBCC]})
+sim.tracer.render_trace(
+    trace_list=[
+        "pixel_in",
+        "pixel_in.red",
+        "pixel_in.green",
+        "pixel_in.blue",
+        "pixel_out",
+    ]
+)
+
+# ----------------------------
+# Part 3: Using wire_matrix
+# ----------------------------
+
+pyrtl.reset_working_block()
+
+PixelPair = pyrtl.wire_matrix(component_schema=Pixel, size=2)
+assert inspect.isclass(PixelPair)
+
+pixel_pair_in = PixelPair(name="pixel_pair_in", concatenated_type=pyrtl.Input)
+
+pixel_pair_out_values = [
+    Pixel(
+        red=pixel_pair_in[0].red + 0x10,
+        green=pixel_pair_in[0].green,
+        blue=pixel_pair_in[0].blue,
+    ),
+    pixel_pair_in[1] + 1,
+]
+
+pixel_pair_out = PixelPair(name="pixel_pair_out", values=pixel_pair_out_values)
+
+print("\nPixelPair slicing and concatenation with wire_matrix:")
+sim = pyrtl.Simulation()
+sim.step_multiple(provided_inputs={"pixel_pair_in": [0x112233AABBCC, 0x445566778899]})
+sim.tracer.render_trace(
+    trace_list=[
+        "pixel_pair_in",
+        "pixel_pair_in[0]",
+        "pixel_pair_in[0].red",
+        "pixel_pair_in[0].green",
+        "pixel_pair_in[0].blue",
+        "pixel_pair_in[1]",
+        "pixel_pair_in[1].red",
+        "pixel_pair_in[1].green",
+        "pixel_pair_in[1].blue",
+        "pixel_pair_out",
+    ]
+)

@@ -1,0 +1,27 @@
+[Keyword]: Count1to10
+
+[Design Category]: Sequential Logic
+
+[Design Function Description]:
+This design is a 4-bit decade counter that counts from 1 to 10. Upon reaching 10, it resets back to 1. The counter is synchronous with the clock signal and can be reset asynchronously to 1.
+
+PyRTL refinement: the prose mentions asynchronous reset, but the provided implementation behaves synchronously. The PyRTL version follows the implementation and uses register initialization plus clocked reset handling.
+
+[Input Signal Description]:
+clk: Clock signal that triggers the counter to increment on each rising edge.
+reset: Asynchronous reset signal that sets the counter to 1 when asserted.
+
+[Output Signal Description]:
+q[3:0]: 4-bit output representing the current count value of the counter, ranging from 1 to 10.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(reset):
+    q = pyrtl.Register(bitwidth=4, name='q', reset_value=1)
+    incremented = (q + pyrtl.Const(1, bitwidth=4))[0:4]
+    wrapped = pyrtl.select(q == pyrtl.Const(10, bitwidth=4), truecase=pyrtl.Const(1, bitwidth=4), falsecase=incremented)
+    q.next <<= pyrtl.select(reset, truecase=pyrtl.Const(1, bitwidth=4), falsecase=wrapped)
+    return q
+```

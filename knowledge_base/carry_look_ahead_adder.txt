@@ -1,0 +1,32 @@
+[Keyword]: carry_look_ahead_adder
+
+[Design Category]: Arithmetic Circuits
+
+[Design Function Description]:
+The design implements a 16-bit carry look-ahead adder. This adder is used to perform fast binary addition of two 16-bit numbers along with an input carry. It uses a hierarchical structure of 4-bit carry look-ahead adders to achieve faster computation by reducing the carry propagation delay.
+
+[Input Signal Description]:
+- a[15:0]: A 16-bit input operand for the addition.
+- b[15:0]: Another 16-bit input operand for the addition.
+- cin: A single-bit input representing the carry-in for the least significant bit addition.
+
+[Output Signal Description]:
+- sum[15:0]: A 16-bit output representing the sum of the input operands a and b, including the carry-in.
+- cout: A single-bit output representing the carry-out from the most significant bit addition.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(a, b, cin):
+    total = (
+        pyrtl.concat(pyrtl.Const(0, bitwidth=1), a)
+        + pyrtl.concat(pyrtl.Const(0, bitwidth=1), b)
+        + pyrtl.concat(pyrtl.Const(0, bitwidth=16), cin)
+    )
+    sum_ = pyrtl.WireVector(bitwidth=16, name='sum')
+    cout = pyrtl.WireVector(bitwidth=1, name='cout')
+    sum_ <<= total[0:16]
+    cout <<= total[16]
+    return sum_, cout
+```

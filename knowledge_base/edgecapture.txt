@@ -1,0 +1,33 @@
+[Keyword]: edgecapture
+
+[Design Category]: Sequential Logic
+
+[Design Function Description]:
+This design detects the falling edges of a 32-bit input signal. It stores the result of the detected falling edges in a 32-bit output register. A falling edge is detected when a bit changes from 1 to 0.
+
+PyRTL refinement: the previous-sample register continues tracking the input during reset handling so that post-reset falling-edge capture matches the intended behavior.
+
+[Input Signal Description]:
+- clk: Clock signal that triggers the sequential logic on its rising edge.
+- reset: Active-high reset signal that initializes the output to zero.
+- in[31:0]: 32-bit input signal that is processed and stored on each clock cycle.
+
+[Output Signal Description]:
+- out[31:0]: 32-bit output signal that is updated based on the bitwise operation involving the current and previous input values.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(reset, in_):  # in_ corresponds to the original Verilog signal named "in"
+    d_last = pyrtl.Register(bitwidth=32, name='d_last', reset_value=0)
+    out = pyrtl.Register(bitwidth=32, name='out', reset_value=0)
+
+    d_last.next <<= in_
+    out.next <<= pyrtl.select(
+        reset,
+        truecase=pyrtl.Const(0, bitwidth=32),
+        falsecase=out | ((~in_) & d_last),
+    )
+    return out
+```

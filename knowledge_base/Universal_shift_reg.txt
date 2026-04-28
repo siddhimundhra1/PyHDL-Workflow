@@ -1,0 +1,38 @@
+[Keyword]: Universal_shift_reg
+
+[Design Category]: Sequential Logic
+
+[Design Function Description]:
+The design is a 4-bit universal shift register. It can perform various operations such as hold, shift left, shift right, parallel load, and more, based on the control signals. The shift register uses multiplexers to select the operation and D flip-flops to store the state.
+
+[Input Signal Description]:
+- `clk`: Clock signal used to synchronize the operations of the shift register.
+- `clear`: Asynchronous clear signal to reset the output to a known state.
+- `S[2:0]`: 3-bit control signal that determines the operation of the shift register (e.g., hold, shift left, shift right, parallel load).
+- `I[3:0]`: 4-bit input data used for parallel loading into the shift register.
+
+[Output Signal Description]:
+- `O[3:0]`: 4-bit output of the shift register, representing the current state of the register.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def _mux8_expr(sel, options):
+    result = options[0]
+    for idx in range(1, 8):
+        result = pyrtl.select(sel == pyrtl.Const(idx, bitwidth=3), truecase=options[idx], falsecase=result)
+    return result
+
+def TopModule(clear, S, I):
+    O = pyrtl.Register(bitwidth=4, name='O', reset_value=0)
+
+    d0 = _mux8_expr(S, [O[0], pyrtl.Const(0, bitwidth=1), O[1], I[0], ~O[0], O[3], O[1], O[2]])
+    d1 = _mux8_expr(S, [O[1], O[0], O[2], I[1], ~O[1], O[0], O[2], O[3]])
+    d2 = _mux8_expr(S, [O[2], O[1], O[3], I[2], ~O[2], O[1], O[3], O[0]])
+    d3 = _mux8_expr(S, [O[3], O[2], pyrtl.Const(0, bitwidth=1), I[3], ~O[3], O[2], O[0], O[1]])
+
+    next_state = pyrtl.concat(d3, d2, d1, d0)
+    O.next <<= pyrtl.select(clear, truecase=pyrtl.Const(0, bitwidth=4), falsecase=next_state)
+    return O
+```

@@ -1,0 +1,73 @@
+[Keyword]: period_counter
+
+[Design Category]: Sequential Logic
+
+[Design Function Description]:
+The design is a period counter that measures the time period of a signal in microseconds. It uses a finite state machine (FSM) to detect the rising edge of the input signal and counts the time between consecutive rising edges. The period is output in terms of microseconds, with a maximum measurable period of 1.023 seconds.
+
+[Input Signal Description]:
+- `clk`: Clock signal used to synchronize the operations of the FSM.
+- `rst_n`: Active-low reset signal to initialize the FSM and registers.
+- `start`: Signal to initiate the period measurement process.
+- `signal`: Input signal whose period is to be measured.
+
+[Output Signal Description]:
+- `ready`: Indicates that the FSM is in the idle state and ready to start a new measurement.
+- `done_tick`: Indicates that the period measurement is complete.
+- `period[19:0]`: 20-bit output representing the measured period in microseconds.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(rst_n, start, signal):
+    idle = pyrtl.Const(0, bitwidth=2)
+    waiting = pyrtl.Const(1, bitwidth=2)
+    op = pyrtl.Const(2, bitwidth=2)
+    done = pyrtl.Const(3, bitwidth=2)
+    n_minus_1 = pyrtl.Const(49, bitwidth=6)
+
+    state_reg = pyrtl.Register(bitwidth=2, name='state_reg', reset_value=0)
+    period_reg = pyrtl.Register(bitwidth=20, name='period_reg', reset_value=0)
+    tick_reg = pyrtl.Register(bitwidth=6, name='tick_reg', reset_value=0)
+    signal_reg = pyrtl.Register(bitwidth=1, name='signal_reg', reset_value=0)
+
+    edg = signal & ~signal_reg
+    next_state = state_reg
+    next_state = pyrtl.select(state_reg == idle, truecase=pyrtl.select(start, truecase=waiting, falsecase=idle), falsecase=next_state)
+    next_state = pyrtl.select(state_reg == waiting, truecase=pyrtl.select(edg, truecase=op, falsecase=waiting), falsecase=next_state)
+    next_state = pyrtl.select(state_reg == op, truecase=pyrtl.select(edg, truecase=done, falsecase=op), falsecase=next_state)
+    next_state = pyrtl.select(state_reg == done, truecase=idle, falsecase=next_state)
+
+    tick_plus = (tick_reg + pyrtl.Const(1, bitwidth=6))[0:6]
+    period_plus = (period_reg + pyrtl.Const(1, bitwidth=20))[0:20]
+
+    next_tick = tick_reg
+    next_tick = pyrtl.select((state_reg == idle) & start, truecase=pyrtl.Const(0, bitwidth=6), falsecase=next_tick)
+    next_tick = pyrtl.select(
+        (state_reg == op) & ~edg,
+        truecase=pyrtl.select(tick_reg == n_minus_1, truecase=pyrtl.Const(0, bitwidth=6), falsecase=tick_plus),
+        falsecase=next_tick,
+    )
+
+    next_period = period_reg
+    next_period = pyrtl.select((state_reg == idle) & start, truecase=pyrtl.Const(0, bitwidth=20), falsecase=next_period)
+    next_period = pyrtl.select(
+        (state_reg == op) & ~edg & (tick_reg == n_minus_1),
+        truecase=period_plus,
+        falsecase=next_period,
+    )
+
+    state_reg.next <<= pyrtl.select(~rst_n, truecase=idle, falsecase=next_state)
+    tick_reg.next <<= pyrtl.select(~rst_n, truecase=pyrtl.Const(0, bitwidth=6), falsecase=next_tick)
+    period_reg.next <<= pyrtl.select(~rst_n, truecase=pyrtl.Const(0, bitwidth=20), falsecase=next_period)
+    signal_reg.next <<= pyrtl.select(~rst_n, truecase=pyrtl.Const(0, bitwidth=1), falsecase=signal)
+
+    ready = pyrtl.WireVector(bitwidth=1, name='ready')
+    done_tick = pyrtl.WireVector(bitwidth=1, name='done_tick')
+    period = pyrtl.WireVector(bitwidth=20, name='period')
+    ready <<= state_reg == idle
+    done_tick <<= state_reg == done
+    period <<= period_reg
+    return ready, done_tick, period
+```

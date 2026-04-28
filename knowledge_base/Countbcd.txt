@@ -1,0 +1,50 @@
+[Keyword]: Countbcd
+
+[Design Category]: Sequential Logic
+
+[Design Function Description]:
+This design implements a 4-digit BCD (Binary-Coded Decimal) counter. The counter increments on each clock cycle and resets to zero when it reaches 9999. The `ena` signals indicate when each BCD digit is at its maximum value of 9, enabling the next higher digit to increment.
+
+[Input Signal Description]:
+- `clk`: Clock signal that drives the counter.
+- `reset`: Synchronous active-high reset signal that initializes the counter to zero when asserted.
+
+[Output Signal Description]:
+- `ena[3:1]`: Enable signals for each BCD digit, indicating when the respective digit is at its maximum value of 9.
+- `q[15:0]`: 16-bit output representing the 4-digit BCD counter value, with each 4-bit segment representing a single BCD digit.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(reset):
+    d0 = pyrtl.Register(bitwidth=4, name='digit0', reset_value=0)
+    d1 = pyrtl.Register(bitwidth=4, name='digit1', reset_value=0)
+    d2 = pyrtl.Register(bitwidth=4, name='digit2', reset_value=0)
+    d3 = pyrtl.Register(bitwidth=4, name='digit3', reset_value=0)
+
+    ena1 = d0 == pyrtl.Const(9, bitwidth=4)
+    ena2 = ena1 & (d1 == pyrtl.Const(9, bitwidth=4))
+    ena3 = ena2 & (d2 == pyrtl.Const(9, bitwidth=4))
+
+    inc0 = (d0 + pyrtl.Const(1, bitwidth=4))[0:4]
+    inc1 = (d1 + pyrtl.Const(1, bitwidth=4))[0:4]
+    inc2 = (d2 + pyrtl.Const(1, bitwidth=4))[0:4]
+    inc3 = (d3 + pyrtl.Const(1, bitwidth=4))[0:4]
+
+    d0_next = pyrtl.select(d0 == pyrtl.Const(9, bitwidth=4), truecase=pyrtl.Const(0, bitwidth=4), falsecase=inc0)
+    d1_advanced = pyrtl.select(d1 == pyrtl.Const(9, bitwidth=4), truecase=pyrtl.Const(0, bitwidth=4), falsecase=inc1)
+    d2_advanced = pyrtl.select(d2 == pyrtl.Const(9, bitwidth=4), truecase=pyrtl.Const(0, bitwidth=4), falsecase=inc2)
+    d3_advanced = pyrtl.select(d3 == pyrtl.Const(9, bitwidth=4), truecase=pyrtl.Const(0, bitwidth=4), falsecase=inc3)
+
+    d0.next <<= pyrtl.select(reset, truecase=pyrtl.Const(0, bitwidth=4), falsecase=d0_next)
+    d1.next <<= pyrtl.select(reset, truecase=pyrtl.Const(0, bitwidth=4), falsecase=pyrtl.select(ena1, truecase=d1_advanced, falsecase=d1))
+    d2.next <<= pyrtl.select(reset, truecase=pyrtl.Const(0, bitwidth=4), falsecase=pyrtl.select(ena2, truecase=d2_advanced, falsecase=d2))
+    d3.next <<= pyrtl.select(reset, truecase=pyrtl.Const(0, bitwidth=4), falsecase=pyrtl.select(ena3, truecase=d3_advanced, falsecase=d3))
+
+    ena = pyrtl.WireVector(bitwidth=3, name='ena')
+    q = pyrtl.WireVector(bitwidth=16, name='q')
+    ena <<= pyrtl.concat(ena3, ena2, ena1)
+    q <<= pyrtl.concat(d3, d2, d1, d0)
+    return ena, q
+```

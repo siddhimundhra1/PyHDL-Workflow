@@ -1,0 +1,31 @@
+[Keyword]: Vectorgates
+
+[Design Category]: Combinational Logic
+
+[Design Function Description]:
+This design performs bitwise OR, logical OR, and bitwise NOT operations on two 3-bit input vectors. It outputs the results of these operations.
+
+[Input Signal Description]:
+a[2:0]: A 3-bit input vector.
+b[2:0]: Another 3-bit input vector.
+
+[Output Signal Description]:
+out_or_bitwise[2:0]: The result of the bitwise OR operation between inputs a and b.
+out_or_logical: The result of the logical OR operation between inputs a and b, which checks if either a or b is non-zero.
+out_not[5:0]: A 6-bit output where the upper 3 bits are the bitwise NOT of b and the lower 3 bits are the bitwise NOT of a.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(a, b):
+    zero3 = pyrtl.Const(0, bitwidth=3)
+    out_or_bitwise = pyrtl.WireVector(bitwidth=3, name='out_or_bitwise')
+    out_or_logical = pyrtl.WireVector(bitwidth=1, name='out_or_logical')
+    out_not = pyrtl.WireVector(bitwidth=6, name='out_not')
+
+    out_or_bitwise <<= a | b
+    out_or_logical <<= (a != zero3) | (b != zero3)
+    out_not <<= pyrtl.concat(~b, ~a)
+    return out_or_bitwise, out_or_logical, out_not
+```

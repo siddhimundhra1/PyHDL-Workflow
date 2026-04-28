@@ -1,0 +1,32 @@
+[Keyword]: Mux_8_to_1
+
+[Design Category]: Combinational Logic
+
+[Design Function Description]:
+This design implements an 8-to-1 multiplexer. It selects one of the eight input signals (in0 to in7) based on a 3-bit selection signal (S) and outputs the selected input through Mux_Out.
+
+[Input Signal Description]:
+- S[2:0]: A 3-bit selection signal that determines which one of the eight inputs (in0 to in7) is routed to the output.  
+- in0, in1, in2, in3, in4, in5, in6, in7: These are the eight input signals to the multiplexer. Each input is a single bit.
+
+[Output Signal Description]:
+- Mux_Out: The output signal of the multiplexer, which is the selected input based on the value of the selection signal S.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(S, in0, in1, in2, in3, in4, in5, in6, in7):
+    selected = in0
+    selected = pyrtl.select(S == pyrtl.Const(1, bitwidth=3), truecase=in1, falsecase=selected)
+    selected = pyrtl.select(S == pyrtl.Const(2, bitwidth=3), truecase=in2, falsecase=selected)
+    selected = pyrtl.select(S == pyrtl.Const(3, bitwidth=3), truecase=in3, falsecase=selected)
+    selected = pyrtl.select(S == pyrtl.Const(4, bitwidth=3), truecase=in4, falsecase=selected)
+    selected = pyrtl.select(S == pyrtl.Const(5, bitwidth=3), truecase=in5, falsecase=selected)
+    selected = pyrtl.select(S == pyrtl.Const(6, bitwidth=3), truecase=in6, falsecase=selected)
+    selected = pyrtl.select(S == pyrtl.Const(7, bitwidth=3), truecase=in7, falsecase=selected)
+
+    Mux_Out = pyrtl.WireVector(bitwidth=1, name='Mux_Out')
+    Mux_Out <<= selected
+    return Mux_Out
+```

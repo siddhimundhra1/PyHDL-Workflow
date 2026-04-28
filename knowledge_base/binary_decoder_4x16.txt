@@ -1,0 +1,23 @@
+[Keyword]: binary_decoder_4x16
+
+[Design Category]: Combinational Logic
+
+[Design Function Description]:
+The design is a 4-to-16 binary decoder. It takes a 4-bit input and decodes it into a 16-bit output, where only one of the 16 output bits is set to '1' based on the binary value of the input, and the rest are set to '0'.
+
+[Input Signal Description]:
+a[3:0]: A 4-bit input signal that represents a binary number. This input is used to determine which one of the 16 output lines will be activated.
+
+[Output Signal Description]:
+bcode[15:0]: A 16-bit output signal where only one bit is set to '1' corresponding to the binary value of the input 'a', and all other bits are '0'.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(a):
+    terms = [a == pyrtl.Const(idx, bitwidth=4) for idx in range(16)]
+    bcode = pyrtl.WireVector(bitwidth=16, name='bcode')
+    bcode <<= pyrtl.concat(*reversed(terms))
+    return bcode
+```

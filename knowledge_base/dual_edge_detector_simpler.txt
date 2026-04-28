@@ -1,0 +1,27 @@
+[Keyword]: dual_edge_detector_simpler
+
+[Design Category]: Sequential Logic
+
+[Design Function Description]:
+The design is a dual-edge detector circuit. It detects changes in the input signal `level` on both the rising and falling edges of the clock signal `clk`. The output `edg` indicates when a change in the `level` input has occurred.
+
+[Input Signal Description]:
+- `clk`: Clock signal used to synchronize the edge detection process.
+- `rst_n`: Active-low reset signal. When asserted (low), it resets the internal state of the circuit.
+- `level`: Input signal whose edges (transitions) are to be detected.
+
+[Output Signal Description]:
+- `edg`: Output signal that indicates a detected edge (transition) in the `level` input. It is high when a change in the `level` input is detected.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(rst_n, level):
+    level_reg = pyrtl.Register(bitwidth=1, name='level_reg', reset_value=0)
+    level_reg.next <<= pyrtl.select(~rst_n, truecase=pyrtl.Const(0, bitwidth=1), falsecase=level)
+
+    edg = pyrtl.WireVector(bitwidth=1, name='edg')
+    edg <<= pyrtl.select(~rst_n, truecase=pyrtl.Const(0, bitwidth=1), falsecase=level ^ level_reg)
+    return edg
+```

@@ -1,0 +1,46 @@
+[Keyword]: Bcdadd4
+
+[Design Category]: Arithmetic Circuits
+
+[Design Function Description]:
+The design implements a 16-bit Binary Coded Decimal (BCD) adder. It takes two 16-bit BCD numbers and a carry-in as inputs and produces a 16-bit BCD sum and a carry-out. The addition is performed in 4-bit BCD segments.
+
+[Input Signal Description]:
+- a[15:0]: A 16-bit input representing the first BCD number.
+- b[15:0]: A 16-bit input representing the second BCD number.
+- cin: A single-bit input representing the initial carry-in for the least significant BCD digit.
+
+[Output Signal Description]:
+- cout: A single-bit output representing the carry-out from the most significant BCD digit.
+- sum[15:0]: A 16-bit output representing the BCD sum of the inputs a and b.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def _bcd_digit_add(a_digit, b_digit, carry_in):
+    temp = (
+        pyrtl.concat(pyrtl.Const(0, bitwidth=1), a_digit)
+        + pyrtl.concat(pyrtl.Const(0, bitwidth=1), b_digit)
+        + pyrtl.concat(pyrtl.Const(0, bitwidth=4), carry_in)
+    )
+    needs_correction = temp > pyrtl.Const(9, bitwidth=5)
+    corrected = (temp + pyrtl.Const(6, bitwidth=5))[0:5]
+    digit_sum = pyrtl.select(needs_correction, truecase=corrected[0:4], falsecase=temp[0:4])
+    digit_cout = pyrtl.select(
+        needs_correction,
+        truecase=pyrtl.Const(1, bitwidth=1),
+        falsecase=pyrtl.Const(0, bitwidth=1),
+    )
+    return digit_sum, digit_cout
+
+def TopModule(a, b, cin):
+    s0, c0 = _bcd_digit_add(a[0:4], b[0:4], cin)
+    s1, c1 = _bcd_digit_add(a[4:8], b[4:8], c0)
+    s2, c2 = _bcd_digit_add(a[8:12], b[8:12], c1)
+    s3, cout = _bcd_digit_add(a[12:16], b[12:16], c2)
+
+    sum_ = pyrtl.WireVector(bitwidth=16, name='sum')
+    sum_ <<= pyrtl.concat(s3, s2, s1, s0)
+    return cout, sum_
+```

@@ -1,0 +1,65 @@
+[Keyword]: bcd_counter
+
+[Design Category]: Sequential Logic
+
+[Design Function Description]:
+This design is a Binary Coded Decimal (BCD) counter that counts from 00 to 49. It uses a two-digit BCD format, where each digit is represented by a 4-bit binary number. The counter increments on the rising edge of a debounced switch signal and resets when the reset signal is active low.
+
+PyRTL refinement: the external debounce helper is not recreated here, so the switch input is assumed to arrive already debounced and the design increments on a detected rising edge of `sw_hi = ~sw`.
+
+[Input Signal Description]:
+- `clk`: Clock signal used to synchronize the counter operations.
+- `rst_n`: Active-low reset signal. When low, it resets the counter to 00.
+- `sw`: Active-low switch input. It is debounced and used to trigger the counting operation.
+
+[Output Signal Description]:
+- `dig1`: 4-bit output representing the tens digit of the BCD counter.
+- `dig0`: 4-bit output representing the units digit of the BCD counter.
+- `done_tick`: Signal that goes high for one clock cycle when the counter increments.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(rst_n, sw):
+    idle = pyrtl.Const(0, bitwidth=1)
+    done = pyrtl.Const(1, bitwidth=1)
+
+    state_reg = pyrtl.Register(bitwidth=1, name='state_reg', reset_value=0)
+    dig1 = pyrtl.Register(bitwidth=4, name='dig1', reset_value=0)
+    dig0 = pyrtl.Register(bitwidth=4, name='dig0', reset_value=0)
+    sw_prev = pyrtl.Register(bitwidth=1, name='sw_prev', reset_value=0)
+
+    sw_hi = ~sw
+    r_edg = sw_hi & ~sw_prev
+
+    dig0_inc = (dig0 + pyrtl.Const(1, bitwidth=4))[0:4]
+    dig1_inc = (dig1 + pyrtl.Const(1, bitwidth=4))[0:4]
+    next_dig0 = pyrtl.select(dig0 == pyrtl.Const(9, bitwidth=4), truecase=pyrtl.Const(0, bitwidth=4), falsecase=dig0_inc)
+    next_dig1 = pyrtl.select(
+        dig0 == pyrtl.Const(9, bitwidth=4),
+        truecase=pyrtl.select(dig1 == pyrtl.Const(4, bitwidth=4), truecase=pyrtl.Const(0, bitwidth=4), falsecase=dig1_inc),
+        falsecase=dig1,
+    )
+
+    state_reg.next <<= pyrtl.select(
+        ~rst_n,
+        truecase=pyrtl.Const(0, bitwidth=1),
+        falsecase=pyrtl.select(state_reg == idle, truecase=pyrtl.select(r_edg, truecase=done, falsecase=idle), falsecase=idle),
+    )
+    dig0.next <<= pyrtl.select(
+        ~rst_n,
+        truecase=pyrtl.Const(0, bitwidth=4),
+        falsecase=pyrtl.select((state_reg == idle) & r_edg, truecase=next_dig0, falsecase=dig0),
+    )
+    dig1.next <<= pyrtl.select(
+        ~rst_n,
+        truecase=pyrtl.Const(0, bitwidth=4),
+        falsecase=pyrtl.select((state_reg == idle) & r_edg, truecase=next_dig1, falsecase=dig1),
+    )
+    sw_prev.next <<= pyrtl.select(~rst_n, truecase=pyrtl.Const(0, bitwidth=1), falsecase=sw_hi)
+
+    done_tick = pyrtl.WireVector(bitwidth=1, name='done_tick')
+    done_tick <<= state_reg == done
+    return dig1, dig0, done_tick
+```

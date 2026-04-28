@@ -1,0 +1,27 @@
+[Keyword]: Popcount3
+
+[Design Category]: Combinational Logic
+
+[Design Function Description]:
+The circuit counts the number of '1's in a 3-bit input vector and outputs the count as a 2-bit binary number.
+
+[Input Signal Description]:
+in[2:0]: A 3-bit input signal representing a binary number, where each bit can be either 0 or 1.
+
+[Output Signal Description]:
+out[1:0]: A 2-bit output signal representing the count of '1's present in the input signal 'in'.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(in_):  # in_ corresponds to the original Verilog signal named "in"
+    count = pyrtl.Const(0, bitwidth=2)
+    for idx in range(3):
+        addend = pyrtl.concat(pyrtl.Const(0, bitwidth=1), in_[idx])
+        count = (count + addend)[0:2]
+
+    out = pyrtl.WireVector(bitwidth=2, name='out')
+    out <<= count
+    return out
+```

@@ -1,0 +1,32 @@
+[Keyword]: adder32
+
+[Design Category]: Arithmetic Circuits
+
+[Design Function Description]:
+This design implements a 32-bit binary adder with carry-in and carry-out functionality. It takes two 32-bit binary numbers and an additional carry-in bit as inputs, and produces a 32-bit sum and a carry-out bit as outputs.
+
+[Input Signal Description]:
+- A[31:0]: A 32-bit input operand for the addition.
+- B[31:0]: Another 32-bit input operand for the addition.
+- Ci: A single-bit carry-in input that is added to the sum of A and B.
+
+[Output Signal Description]:
+- S[31:0]: A 32-bit output representing the sum of the inputs A, B, and the carry-in Ci.
+- Co: A single-bit carry-out output that indicates an overflow from the most significant bit of the sum.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(A, B, Ci):
+    total = (
+        pyrtl.concat(pyrtl.Const(0, bitwidth=1), A)
+        + pyrtl.concat(pyrtl.Const(0, bitwidth=1), B)
+        + pyrtl.concat(pyrtl.Const(0, bitwidth=32), Ci)
+    )
+    S = pyrtl.WireVector(bitwidth=32, name='S')
+    Co = pyrtl.WireVector(bitwidth=1, name='Co')
+    S <<= total[0:32]
+    Co <<= total[32]
+    return S, Co
+```

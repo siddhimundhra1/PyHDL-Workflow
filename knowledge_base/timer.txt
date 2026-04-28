@@ -1,0 +1,35 @@
+[Keyword]: timer
+
+[Design Category]: Sequential Logic
+
+[Design Function Description]:
+This design implements a 2-second countdown timer. The timer starts counting down from a preset value when triggered and signals when the countdown reaches zero.
+
+[Input Signal Description]:
+- clk: Clock signal used to synchronize the timer operations.
+- rst_n: Active-low reset signal to initialize or reset the timer.
+- timer_start: Signal to start the timer countdown from the preset value.
+- timer_tick: Signal that ticks at 60Hz, used to decrement the timer value.
+
+[Output Signal Description]:
+- timer_up: Output signal that indicates the timer has reached zero.
+
+[Design Detail]:
+```python
+import pyrtl
+
+def TopModule(rst_n, timer_start, timer_tick):
+    timer_q = pyrtl.Register(bitwidth=7, name='timer_q', reset_value=0)
+    decremented = (timer_q - pyrtl.Const(1, bitwidth=7))[0:7]
+    tick_value = pyrtl.select(timer_q == pyrtl.Const(0, bitwidth=7), truecase=pyrtl.Const(0, bitwidth=7), falsecase=decremented)
+    next_value = pyrtl.select(
+        timer_start,
+        truecase=pyrtl.Const(0x7F, bitwidth=7),
+        falsecase=pyrtl.select(timer_tick, truecase=tick_value, falsecase=timer_q),
+    )
+    timer_q.next <<= pyrtl.select(~rst_n, truecase=pyrtl.Const(0, bitwidth=7), falsecase=next_value)
+
+    timer_up = pyrtl.WireVector(bitwidth=1, name='timer_up')
+    timer_up <<= timer_q == pyrtl.Const(0, bitwidth=7)
+    return timer_up
+```
