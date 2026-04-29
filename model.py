@@ -12,14 +12,17 @@ from tenacity import (
 from transformers.generation.utils import GenerationMixin
 import numpy as np
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from config import *
+from huggingface_hub import InferenceClient
+from openrouter import OpenRouter
+import os
+#from config import *
 
 class ChatModel():
     def __init__(
         self,
-        model_name: str = "gemini-2.0-flash-exp",
-        max_tokens: int = 2048,
-        temperature: float = 0.4,
+        model_name: str = "gemini-3-flash-preview",
+        max_tokens: int = 7409,
+        temperature: float = 0.8,
         n: int = 1,
         local = False
     ):
@@ -34,44 +37,45 @@ class ChatModel():
             self.model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype="auto", device_map="auto")
             self.tokenizer = AutoTokenizer.from_pretrained(model_name)
 
-
     @retry(wait=wait_random_exponential(min=1, max=60),stop=stop_after_attempt(6))
     def generate_remote(self, messages: List[Dict]) -> Union[List[str], str]:
 
         headers = {
-            "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
         }
 
+        # convert messages -> gemini format
+        prompt = "\n".join([m["content"] for m in messages])
+
         payload = {
-            "model": self.model_name,
-            "messages": messages,
-            "temperature": self.temperature,
-            "max_tokens": self.max_tokens,
-            "n": self.n
+            "contents": [
+                {
+                    "parts": [{"text": prompt}]
+                }
+            ],
+            "generationConfig": {
+                "temperature": self.temperature,
+                "maxOutputTokens": self.max_tokens
+            }
         }
 
-        response = requests.post(
-            api_base,
-            headers=headers,
-            json=payload
-        )
+        print ("Gemini prompt given: "+prompt)
 
-        # DEBUG SAFETY (prevents JSONDecodeError)
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model_name}:generateContent?key=GEMINI_KEY"
+        response = requests.post(url, headers=headers, json=payload)
+
         if response.status_code != 200:
+            print("URL:", url)
+            print("Response:", response.text)
             raise RuntimeError(
-                f"HF API Error {response.status_code}:\n{response.text}"
+                f"Gemini API Error {response.status_code}:\n{response.text}"
             )
 
         response = response.json()
+        print ("Response generated:" + response["candidates"][0]["content"]["parts"][0]["text"])
+        return response["candidates"][0]["content"]["parts"][0]["text"]    
 
-        if self.n == 1:
-            return response["choices"][0]["message"]["content"]
 
-        return [
-            choice["message"]["content"]
-            for choice in response["choices"]
-        ]
 
 
     def generate_local(self, messages: List[Dict]) -> Union[List[str], str]:
@@ -95,6 +99,8 @@ class ChatModel():
         return response
 
 
+
+
     def generate(self, messages: List[Dict]) -> Union[List[str], str]:
         if self.local == True:
             return self.generate_local(messages)
@@ -104,15 +110,15 @@ class ChatModel():
 
 if __name__ == "__main__":
     system_prompt = """
-You only complete chats with syntax correct Verilog code. End the Verilog module code completion with 'endmodule'. Do not include module, input and output definitions.
+You only complete chats with syntax correct Pyrtl code.
 """
 
     user_prompt = """
 """
 
     llm = ChatModel(
-        model_name="gemini-2.0-flash-exp",
-        temperature=0.1,
+        model_name="gemini-2.5-flash",
+        temperature=0.8,
         local=False
     )
 
@@ -123,3 +129,133 @@ You only complete chats with syntax correct Verilog code. End the Verilog module
 
     response = llm.generate(messages)
     print(response)
+
+
+
+
+"""    
+"""
+
+
+
+
+"""    @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
+    def generate_remote(self, messages: List[Dict]) -> Union[List[str], str]:
+        try:
+            client = InferenceClient(provider="featherless-ai", api_key="HF_TOKEN")
+            prompt = "\n".join([m["content"] for m in messages])
+            completion = client.text_generation(
+                model="meta-llama/Meta-Llama-3-70B",
+                prompt=prompt,
+                max_new_tokens=self.max_tokens,
+                temperature=self.temperature
+            )
+            print (completion)
+            return completion
+        except Exception as e:
+            print(f"HF ERROR: {e}")
+            # Note: your function signature expects a string or list of strings, 
+            # so returning a tuple ("unknown", "...") might cause issues later.
+            return "LLM annotation failed."
+"""
+
+
+
+
+"""
+    @retry(wait=wait_random_exponential(min=1, max=60),stop=stop_after_attempt(6))
+    def generate_remote(self, messages: List[Dict]) -> Union[List[str], str]:
+
+        headers = {
+            "Content-Type": "application/json"
+        }
+
+        # convert messages -> gemini format
+        prompt = "\n".join([m["content"] for m in messages])
+
+        payload = {
+            "contents": [
+                {
+                    "parts": [{"text": prompt}]
+                }
+            ],
+            "generationConfig": {
+                "temperature": self.temperature,
+                "maxOutputTokens": self.max_tokens
+            }
+        }
+
+        print ("Gemini prompt given: "+prompt)
+
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model_name}:generateContent?key=GEMINI_KEY"
+        response = requests.post(url, headers=headers, json=payload)
+
+        if response.status_code != 200:
+            print("URL:", url)
+            print("Response:", response.text)
+            raise RuntimeError(
+                f"Gemini API Error {response.status_code}:\n{response.text}"
+            )
+
+        response = response.json()
+        print ("Response generated:" + response["candidates"][0]["content"]["parts"][0]["text"])
+        return response["candidates"][0]["content"]["parts"][0]["text"]    
+
+
+
+ try:
+            client = InferenceClient(provider="featherless-ai", api_key="HF_TOKEN")
+            prompt = "\n".join([m["content"] for m in messages])
+            completion = client.text_generation(
+                model="meta-llama/Meta-Llama-3-70B",
+                prompt=prompt,
+                max_new_tokens=self.max_tokens,
+                temperature=self.temperature
+            )
+            print (completion)
+            return completion
+        except Exception as e:
+            print(f"HF ERROR: {e}")
+            # Note: your function signature expects a string or list of strings, 
+            # so returning a tuple ("unknown", "...") might cause issues later.
+            return "LLM annotation failed."
+
+
+
+
+
+                        
+    @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
+    def generate_remote(self, messages: List[Dict]) -> Union[List[str], str]:
+        try:
+            prompt = "\n".join([m["content"] for m in messages])
+
+            with OpenRouter(
+                api_key="OPENROUTER_KEY"
+            ) as client:
+
+                response = client.chat.send(
+                    model="meta-llama/llama-3.3-70b-instruct:free",
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
+                    ],
+                    temperature=self.temperature,
+                    max_tokens=self.max_tokens
+                )
+
+                text = response.choices[0].message.content
+                print(text)
+                return text
+
+        except Exception as e:
+            import traceback
+            print("OPENROUTER ERROR:", repr(e))
+            traceback.print_exc()
+            raise
+"""
+
+
+
