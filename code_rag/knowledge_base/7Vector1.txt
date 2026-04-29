@@ -11,11 +11,13 @@ in[15:0]: A 16-bit input signal that is to be split into two 8-bit segments.
 [Output Signal Description]:
 out_hi[7:0]: An 8-bit output signal representing the higher 8 bits of the input.
 out_lo[7:0]: An 8-bit output signal representing the lower 8 bits of the input.
+
 [Design Detail]:
 ```python
 import pyrtl
 
 def TopModule(in_):  # in_ corresponds to the original Verilog signal named "in"
+    out_hi = pyrtl.WireVector(bitwidth=8, name='out_hi')
     out_lo = pyrtl.WireVector(bitwidth=8, name='out_lo')
     out_hi <<= in_[8:16]
     out_lo <<= in_[0:8]
