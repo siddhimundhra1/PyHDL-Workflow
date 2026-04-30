@@ -1,99 +1,125 @@
 import os
-import openai
+import sys
+#import openai
 import numpy as np
 import faiss
 import csv
 from sentence_transformers import SentenceTransformer
 import torch
 import logging
+from huggingface_hub import InferenceClient
+import requests
 
-EMBEDDING_MODEL_NAME = "BAAI/bge-large-en-v1.5"
+try:
+    from config import hf_token
+except ModuleNotFoundError:
+    sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+    from config import hf_token
 
 
-model = SentenceTransformer(EMBEDDING_MODEL_NAME)
-EMBEDDING_DIM = model.get_sentence_embedding_dimension()
-
-index = faiss.IndexFlatL2(EMBEDDING_DIM)
+#model = SentenceTransformer("Qwen/Qwen3-Embedding-0.6B")
+index = None
+EMBEDDING_DIM = None
 metadata = []
-WATCHED_DIR = "./code_rag/knowledge_base"
-FAISS_INDEX_FILE = os.path.join(WATCHED_DIR, 'coderag_index.faiss')
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+WATCHED_DIR = os.path.join(BASE_DIR, "knowledge_base")
+RAG_DIR = WATCHED_DIR
+FAISS_INDEX_FILE = os.path.join(RAG_DIR, 'coderag_index.faiss')
+METADATA_FILE = os.path.join(RAG_DIR, "metadata.csv")
 
-def generate_embeddings(content: str, local = True):
-    if local == False:
+def generate_embeddings(content: str, local=False):
+    if not local:
         try:
-            response = openai.Embedding.create(
-                input = content,
-                model = model
-            )
-            embeddings = response['data'][0]['embedding']
-            return np.array(embeddings).astype('float32').reshape(1, -1)
+            API_URL = "https://router.huggingface.co/hf-inference/models/sentence-transformers/all-MiniLM-L6-v2/pipeline/feature-extraction"
+            headers = {
+                "Authorization": f"Bearer {hf_token}",
+                "Content-Type": "application/json",
+            }
+
+            response = requests.post(API_URL, headers=headers, json={"inputs": content})
+            response.raise_for_status()
+            output = response.json()
+
+            if isinstance(output, list):
+                if isinstance(output[0], list):
+                    embedding = np.array(output[0]).astype('float32')
+                else:
+                    embedding = np.array(output).astype('float32')
+            else:
+                print(f"Unexpected response format: {output}")
+                return None
+
+            return embedding.reshape(1, -1)
+
         except Exception as e:
-            print(f"Error generating embeddings with OpenAI: {e}")
+            print(f"Error generating embeddings: {e}")
             return None
-    else: 
-        with torch.no_grad():
-            embeddings = model.encode(content)
-        return np.array(embeddings).astype('float32').reshape(1, -1)
+
 
 def clear_index():
-    """Delete the FAISS index and metadata files if they exist, and reinitialize the index."""
-    global index, metadata
-    
-    # Delete the FAISS index file
+    global index, metadata, EMBEDDING_DIM
+
     if os.path.exists(FAISS_INDEX_FILE):
         os.remove(FAISS_INDEX_FILE)
-        print(f"Deleted FAISS index file: {FAISS_INDEX_FILE}")
 
-    # Delete the metadata file
-    metadata_file = f"{WATCHED_DIR}/metadata.csv"
-    if os.path.exists(metadata_file):
-        os.remove(metadata_file)
-        print(f"Deleted metadata file: {metadata_file}")
+    if os.path.exists(METADATA_FILE):
+        os.remove(METADATA_FILE)
 
-    # Reinitialize the FAISS index and metadata
-    index = faiss.IndexFlatL2(EMBEDDING_DIM)
+    index = None
+    EMBEDDING_DIM = None
     metadata = []
 
 def add_to_index(embeddings, full_content, file_name, file_path):
-    global index, metadata
+    global index, metadata, EMBEDDING_DIM
+
+    if index is None:
+        EMBEDDING_DIM = embeddings.shape[1]
+        index = faiss.IndexFlatL2(EMBEDDING_DIM)
 
     if embeddings.shape[1] != index.d:
-        raise ValueError(f"Embedding dimension {embeddings.shape[1]} does not match FAISS index dimension {index.d}")
-    
+        raise ValueError(
+            f"Embedding dimension {embeddings.shape[1]} does not match FAISS index dimension {index.d}"
+        )
+
     keyword = full_content.split('\n')[0].split('[Keyword]: ')[1]
     relative_file_path = os.path.relpath(file_path, WATCHED_DIR)
-    
+
     index.add(embeddings)
+
     metadata.append({
         "keyword": keyword,
         "content": full_content,
-        "filename":file_name,
+        "filename": file_name,
         "filepath": relative_file_path
     })
 
 def save_index():
     faiss.write_index(index, FAISS_INDEX_FILE)
-    with open(f"{WATCHED_DIR}/metadata.csv", "w", newline="", encoding = 'utf-8') as f:
+    with open(METADATA_FILE, "w", newline="", encoding = 'utf-8') as f:
         fieldnames = ['keyword', 'content', 'filename', 'filepath']
         writer = csv.DictWriter(f, fieldnames = fieldnames, quoting=csv.QUOTE_MINIMAL)
         writer.writeheader()
         writer.writerows(metadata)
 
 def load_index():
-    global index, metadata
+    global index, metadata, EMBEDDING_DIM
+
     index = faiss.read_index(FAISS_INDEX_FILE)
-    
+    EMBEDDING_DIM = index.d
+
     loaded_metadata = []
-    csv.field_size_limit(10 * 1024 * 1024) 
-    with open(f"{WATCHED_DIR}/metadata.csv", "r", encoding = 'utf-8') as f:
+    csv.field_size_limit(10 * 1024 * 1024)
+
+    with open(METADATA_FILE, "r", encoding='utf-8') as f:
         reader = csv.DictReader(f)
         for row in reader:
             loaded_metadata.append(row)
+
     metadata = loaded_metadata
-    
-    #print(metadata)
 
     return index, metadata
+
+
 
 def retrieve_vectors(n=5):
     n = min(n, index.ntotal)

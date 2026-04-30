@@ -1,64 +1,40 @@
-from rule_based_description_refinement import rule_based_description_refinement
-from multimodal_data_conversion import multimodal_data_conversion
-from rag_based_knowledge_error_mitigation import rag_based_knowledge_error_mitigation
-from two_stage_localization_and_correction import two_stage_localization_and_correction
-from utils import run_design
-import os
 from model import ChatModel
-from config import *
-
-#VerilogEval_Human
-task_prompt = """
-You only complete chats with syntax correct Verilog code. 
-End the Verilog module code completion with 'endmodule'.
-Do not include module, input and output definitions.
-"""
-
-def main():
-    
-    llm = ChatModel(model_name = model_name, temperature = temperature, local = local)
-
-    with open("./input/description.txt", "r", encoding = 'utf-8', errors = 'ignore') as file: description = file.read()
-    with open("./input/ref.sv", "r", encoding = 'utf-8', errors = 'ignore') as file: ref = file.read()
-    with open("./input/testbench.sv", "r", encoding = 'utf-8', errors = 'ignore') as file: testbench = file.read()
-    
-    design, refined_description =  rule_based_description_refinement(llm, description, task_prompt)
-    succeed, status, fail_messages = run_design(design, ref, testbench)
-    corrected_design = design
-    if not succeed:
-        design, meta_format = multimodal_data_conversion(description, design)
-        refine_description = refine_description + f"[Multimodal Data Meta Format]:{refine_description}\n"
-        succeed, status, fail_messages = run_design(design, ref, testbench)
-
-        if not succeed:
-            design, example_prompt = rag_based_knowledge_error_mitigation(llm, description)
-            succeed, status, fail_message = run_design(design, ref, testbench)
-
-            if not succeed:
-                if iter_with_example == False:
-                    example_prompt = ""
-                
-                design =  two_stage_localization_and_correction(llm, description, design, ref, testbench, example_prompt, max_iter)
-                succeed, status, fail_message = run_design(design, ref, testbench)
-                
-                if not succeed:
-                    print("Generate Wrong...")
-                else:
-                    print("Generate Correct (Two Stage Localization and Correction)...")    
-            
-            else:
-                print("Generate Correct (RAG based Knowledge Error Mitigation)...") 
-            
-        else:
-            print("Generate Correct (Multimodal Data Conversion)...") 
-    
-    else:
-        print("Generate Correct (Rule based Description Refinement)...")
-
-                        
-    with open("./input/design.sv", "w") as file: file.write(design)
-
-
+from rule_based_description_refinement import rule_based_description_refinement
+from rag_based_knowledge_error_mitigation import rag_based_knowledge_error_mitigation
+import time
+import os
+from config import model_name
 
 if __name__ == "__main__":
-    main()
+
+    task_prompt = "You only complete chats with syntax correct PyRTL code.\n"
+    input_path = "./input"
+    description_path = f"{input_path}/original_description.txt"
+    if not os.path.exists(description_path):
+        description_path = f"{input_path}/description.txt"
+
+    llm = ChatModel(model_name=model_name, temperature=0.8, local=False)
+
+    with open(description_path, "r", encoding='utf-8', errors='ignore') as file:
+        description = file.read()
+
+    for i in range(1, 21):
+        idx = f"{i:02d}"  # 01, 02, ..., 20
+
+        # Baseline: no rules or RAG
+        # messages = [{"role": "user", "content": task_prompt + "\n" + description}]
+        # response = llm.generate(messages)
+        #with open(f"{input_path}/no_rules_or_rag_{idx}.py", "w", encoding='utf-8', errors='ignore') as file:
+        #    file.write(response)
+
+        # Stage 1: rule-based description refinement
+        design, refined_description = rule_based_description_refinement(llm, description, task_prompt)
+        #with open(f"{input_path}/description_{idx}.txt", "w", encoding='utf-8', errors='ignore') as file:
+        #    file.write(refined_description)
+
+        # Stage 2: RAG-based generation on refined description
+        # corrected_design, example_prompt = rag_based_knowledge_error_mitigation(llm, refined_description)
+        with open(f"{input_path}/output/Prob05p01_comb_mux_1b_2to1_sample{idx}.py", "w", encoding='utf-8', errors='ignore') as file:
+            # file.write(corrected_design)
+            file.write(design)
+        time.sleep(10)
