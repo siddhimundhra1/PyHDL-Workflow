@@ -3,6 +3,7 @@ import os
 import re
 from model import ChatModel
 from utils import parse_code_block, run_design
+from config import model_name
 
 description_refinement_rules = """
 As a PyRTL hardware-design understanding expert, you will be given a natural language module description.
@@ -19,8 +20,8 @@ Focus on the following:
    - If the behavior is still underspecified, explicitly note what is missing and state the most reasonable assumption.
 
 2. Clarify all interfaces in PyRTL terms.
-   - Identify which signals should be pyrtl.Input, pyrtl.Output, internal pyrtl.WireVector values,
-     pyrtl.Register state, and pyrtl.MemBlock / pyrtl.RomBlock objects when memories are implied.
+   - Identify which signals should be Input, Output, internal WireVector values,
+     Register state, and MemBlock / RomBlock objects when memories are implied.
    - For each input and output, infer and supplement:
        * purpose
        * bitwidth
@@ -43,7 +44,7 @@ Focus on the following:
    - If conditional behavior is described incompletely, state the intended default/fallthrough behavior explicitly.
 
 5. Clarify width, signedness, and indexing assumptions.
-   - If bitwidths are missing, infer the smallest sensible widths and state them explicitly.
+   - If bitwidths are missing, infer the smallest sensible widths and state them explicitly inside the function.
    - If signed arithmetic or signed comparison is intended, say so explicitly instead of assuming default arithmetic.
    - If bit extraction or slicing is mentioned, restate the exact bit positions and direction clearly.
 
@@ -82,7 +83,11 @@ def TopModule(...):
 - Do not call pyrtl.Simulation().
 - Do NOT explicitly define clock signals, they are implicit.
 - Do not use "don't care" terms like z and x.
-
+- Use from pyrtl import * instead of import pyrtl.
+- Do NOT name the signals "out" or "in"
+- Use only pyrtl library functions and definitions, like WireVector instead of Wire.
+- Do NOT define parameter types and output types in function signature.
+- DO NOT define bitwidths inside the function signature 
 """
 
 
@@ -138,7 +143,7 @@ def rule_based_description_refinement(llm: ChatModel, description: str, task_pro
 
 
 if __name__ == "__main__":
-    llm = ChatModel(model_name="gemini-3-flash-preview", temperature=0.1, local=False)
+    llm = ChatModel(model_name=model_name, temperature=0.1, local=False)
 
     task_prompt = """
     You only complete chats with syntax correct PyRTL code. 
@@ -148,7 +153,7 @@ if __name__ == "__main__":
 
     input_path = "./input"
 
-    llm = ChatModel(model_name="gemini-3-flash-preview", temperature=0.1, local=False)
+    llm = ChatModel(model_name=model_name, temperature=0.1, local=False)
 
     with open(f"{input_path}/description.txt", "r", encoding='utf-8', errors='ignore') as file:
         description = file.read()
