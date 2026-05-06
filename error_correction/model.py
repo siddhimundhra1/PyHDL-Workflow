@@ -15,7 +15,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from huggingface_hub import InferenceClient
 from openrouter import OpenRouter
 import os
-from config import api_key
+from config import api_key, hf_token
 
 class ChatModel():
     def __init__(
@@ -39,6 +39,33 @@ class ChatModel():
 
     @retry(wait=wait_random_exponential(min=1, max=60),stop=stop_after_attempt(6))
     def generate_remote(self, messages: List[Dict]) -> Union[List[str], str]:
+        if "llama" in self.model_name.lower():
+            prompt = "\n".join([m["content"] for m in messages])
+            print("Llama prompt given: " + prompt)
+
+            try:
+                client = InferenceClient(api_key=hf_token)
+
+                try:
+                    completion = client.chat.completions.create(
+                        model=self.model_name,
+                        messages=messages,
+                        temperature=self.temperature,
+                        max_tokens=min(self.max_tokens, 4096)
+                    )
+                    response_text = completion.choices[0].message.content
+                except Exception:
+                    response_text = client.text_generation(
+                        model=self.model_name,
+                        prompt=prompt,
+                        max_new_tokens=min(self.max_tokens, 4096),
+                        temperature=self.temperature
+                    )
+
+                print("Response generated:" + response_text)
+                return response_text
+            except Exception as e:
+                raise RuntimeError(f"Llama API Error:\n{e}") from e
 
         headers = {
             "Content-Type": "application/json"

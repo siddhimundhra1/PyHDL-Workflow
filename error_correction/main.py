@@ -9,6 +9,7 @@ if __name__ == "__main__":
 
     task_prompt = "You only complete chats with syntax correct PyRTL code.\n"
     input_path = "./input"
+    output_name = "Prob05p01_comb_mux_1b_2to1"
     description_path = f"{input_path}/original_description.txt"
     if not os.path.exists(description_path):
         description_path = f"{input_path}/description.txt"
@@ -34,7 +35,9 @@ if __name__ == "__main__":
 
         # Stage 2: RAG-based generation on refined description
         # corrected_design, example_prompt = rag_based_knowledge_error_mitigation(llm, refined_description)
-        with open(f"{input_path}/output/Prob05p01_comb_mux_1b_2to1_sample{idx}.py", "w", encoding='utf-8', errors='ignore') as file:
+        # corrected_design, example_prompt = rag_based_knowledge_error_mitigation(llm, description)
+
+        with open(f"{input_path}/output/{output_name}_sample{idx}.py", "w", encoding='utf-8', errors='ignore') as file:
             # file.write(corrected_design)
             file.write(design)
         time.sleep(10)
